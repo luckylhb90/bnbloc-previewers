@@ -3,7 +3,7 @@
   "contract": "bnbloc.previewer.contract/v1",
   "runtime": "bundle",
   "name": "sprite-sheet",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "publisher": "bnbloc-examples",
   "description": "Reference previewer: images and sprite-sheet / texture-atlas JSON with zoom, fit, grid, checkerboard and frame-boundary layers.",
   "artifacts": {

@@ -3,7 +3,7 @@
   "contract": "bnbloc.previewer.contract/v1",
   "runtime": "bundle",
   "name": "drawio",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "publisher": "bnbloc",
   "description": "draw.io diagrams (.drawio, .dio): every page drawn in place with its shapes, connectors and labels, page tabs and zoom; point at a box or an arrow to ask about it.",
   "artifacts": {

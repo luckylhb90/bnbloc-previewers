@@ -3,7 +3,7 @@
   "contract": "bnbloc.previewer.contract/v1",
   "runtime": "bundle",
   "name": "mermaid",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "publisher": "bnbloc",
   "description": "Mermaid diagrams (.mmd, .mermaid): flowcharts, sequence, class, state, ER, Gantt and more, drawn from their source, with zoom, parse errors shown with their line, and a click on a box naming it for the Ask AI panel.",
   "artifacts": {
