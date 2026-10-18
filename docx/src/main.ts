@@ -25,8 +25,8 @@ import {
   setToolbar,
   type PreviewFile,
   type ToolbarItem,
-} from "../../../../web/previewer-sdk/src/index.ts";
-import { renderPageCover } from "../../../../web/previewer-sdk/src/cover.ts";
+} from "@bnbloc/previewer-sdk";
+import { renderPageCover } from "@bnbloc/previewer-sdk/cover";
 import { unicodeBullets } from "./bullets.ts";
 import { docUnits, pageCover } from "./units.ts";
 import { countedTitle, keepLinksInside, sniffOffice, unreadableMessage, type OfficeKind } from "../../lib/office.ts";

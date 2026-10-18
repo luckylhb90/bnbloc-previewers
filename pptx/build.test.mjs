@@ -37,7 +37,7 @@ test("units: one per slide keyed by id; an edited title is one changed slide", a
   const { readFile } = await import("node:fs/promises");
   const JSZip = (await import("jszip")).default;
   const { deckUnits } = await import("./src/units.ts");
-  const { diffUnits } = await import("../../../web/src/lib/compareUnits.ts");
+  const { diffUnits } = await import("@bnbloc/previewer-sdk/compare");
   const bytes = await readFile(new URL("./samples/deck.pptx", import.meta.url));
   const before = await deckUnits(JSZip, bytes);
   assert.deepEqual(before.map((u) => u.label), ["Slide 1 · Quarterly review", "Slide 2 · Highlights", "Slide 3 · By region", "Slide 4 · Growth", "Slide 5 · Thank you"]);

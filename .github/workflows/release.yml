@@ -1,0 +1,32 @@
+name: release
+
+# A pushed tag vX.Y.Z builds every previewer and attaches each one's
+# bundle.tar and package.json (named <previewer>-bundle.tar,
+# <previewer>-package.json), with SHA256SUMS.txt, to the GitHub release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - run: scripts/ci.sh
+      - name: Collect
+        run: |
+          mkdir -p release
+          for p in sprite-sheet pptx docx xlsx mermaid drawio; do
+            cp "$p/dist/bundle.tar" "release/$p-bundle.tar"
+            cp "$p/dist/package.json" "release/$p-package.json"
+          done
+          (cd release && sha256sum * > SHA256SUMS.txt)
+      - name: Release
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: gh release create "$GITHUB_REF_NAME" release/* --title "bnbloc-previewers $GITHUB_REF_NAME" --generate-notes

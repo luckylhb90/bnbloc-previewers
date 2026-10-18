@@ -28,8 +28,8 @@ import {
   setToolbar,
   type PreviewFile,
   type ToolbarItem,
-} from "../../../../web/previewer-sdk/src/index.ts";
-import { renderGridCover } from "../../../../web/previewer-sdk/src/cover.ts";
+} from "@bnbloc/previewer-sdk";
+import { renderGridCover } from "@bnbloc/previewer-sdk/cover";
 import { shortName, sniffOffice, unreadableMessage, type OfficeKind } from "../../lib/office.ts";
 import { PICKED, pendingReveal, reveal, selectionReporter } from "../../lib/selection.ts";
 import { workbookUnits } from "./units.ts";

@@ -20,8 +20,8 @@ import {
   setTitle,
   setToolbar,
   type ToolbarItem,
-} from "../../../../web/previewer-sdk/src/index.ts";
-import { renderCover } from "../../../../web/previewer-sdk/src/cover.ts";
+} from "@bnbloc/previewer-sdk";
+import { renderCover } from "@bnbloc/previewer-sdk/cover";
 import { keepLinksInside } from "../../lib/office.ts";
 import { collapseText, quotedLabel, watchPointing } from "../../lib/selection.ts";
 import { clampZoom, fitZoom } from "../../lib/zoom.ts";

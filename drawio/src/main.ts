@@ -24,8 +24,8 @@ import {
   setToolbar,
   type PreviewFile,
   type ToolbarItem,
-} from "../../../../web/previewer-sdk/src/index.ts";
-import { renderCover } from "../../../../web/previewer-sdk/src/cover.ts";
+} from "@bnbloc/previewer-sdk";
+import { renderCover } from "@bnbloc/previewer-sdk/cover";
 import { countedTitle, keepLinksInside, shortName } from "../../lib/office.ts";
 import { pendingReveal, reveal, watchPointing } from "../../lib/selection.ts";
 import { clampZoom, fitZoom } from "../../lib/zoom.ts";

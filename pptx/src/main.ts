@@ -25,8 +25,8 @@ import {
   setToolbar,
   type PreviewFile,
   type ToolbarItem,
-} from "../../../../web/previewer-sdk/src/index.ts";
-import { renderSlideCover } from "../../../../web/previewer-sdk/src/cover.ts";
+} from "@bnbloc/previewer-sdk";
+import { renderSlideCover } from "@bnbloc/previewer-sdk/cover";
 import { countedTitle, keepLinksInside, sniffOffice, unreadableMessage, type OfficeKind } from "../../lib/office.ts";
 import { pendingReveal, reveal, watchPointing } from "../../lib/selection.ts";
 import { deckSlideKeys, deckUnits, slideCover } from "./units.ts";

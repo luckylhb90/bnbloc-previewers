@@ -3,7 +3,7 @@
 // from the element mermaid drew it as, and the source's statements as
 // Compare units. docs/prd/2026-10-16-diagram-previewers.md rules 4 and 6.
 
-import type { UnitDraft } from "../../../../web/previewer-sdk/src/index.ts";
+import type { UnitDraft } from "@bnbloc/previewer-sdk";
 
 const LINE_QUOTE_LIMIT = 160;
 const MAX_NAMING_LINES = 3;

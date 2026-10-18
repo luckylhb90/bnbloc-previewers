@@ -41,7 +41,7 @@ test("units: paragraphs and tables under their headings; an inserted paragraph i
   const { readFile } = await import("node:fs/promises");
   const JSZip = (await import("jszip")).default;
   const { docUnits } = await import("./src/units.ts");
-  const { diffUnits } = await import("../../../web/src/lib/compareUnits.ts");
+  const { diffUnits } = await import("@bnbloc/previewer-sdk/compare");
   const bytes = await readFile(new URL("./samples/doc.docx", import.meta.url));
   const before = await docUnits(JSZip, bytes);
   assert.ok(before.some((u) => u.label === "Table · By region" && u.text.startsWith("Region\tQ1\tQ2\nNorth\t120\t140")), "a table as tab-separated rows");

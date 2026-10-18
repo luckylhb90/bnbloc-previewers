@@ -1,7 +1,7 @@
 // Zoom and fit for a previewer that draws one picture (a diagram): the toolbar
 // zoom factor's bounds and the factor that shows the whole picture.
 
-import { ZOOM_MAX, ZOOM_MIN } from "../../../web/previewer-sdk/src/index.ts";
+import { ZOOM_MAX, ZOOM_MIN } from "@bnbloc/previewer-sdk";
 
 export function clampZoom(z: number): number {
   return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));

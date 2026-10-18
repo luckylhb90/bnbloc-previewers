@@ -116,7 +116,7 @@ test("a picked range: its label, its extent with merges, its values", () => {
 
 test("units: non-empty cells keyed by address, merged ranges once, formulas kept, bounded", async () => {
   const { workbookUnits } = await import("./src/units.ts");
-  const { diffUnits } = await import("../../../web/src/lib/compareUnits.ts");
+  const { diffUnits } = await import("@bnbloc/previewer-sdk/compare");
   const load = async (buf) => {
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(buf);

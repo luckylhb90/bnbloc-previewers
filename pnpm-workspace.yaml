@@ -1,0 +1,8 @@
+# The root holds the shared build tools (esbuild, TypeScript, the previewer
+# SDK); each previewer installs its own runtime dependencies from its own
+# lockfile (`pnpm --dir <previewer> install`).
+packages: []
+allowBuilds:
+  esbuild: true
+onlyBuiltDependencies:
+  - esbuild

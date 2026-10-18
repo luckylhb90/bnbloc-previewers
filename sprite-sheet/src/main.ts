@@ -23,7 +23,7 @@ import {
   type PreviewFile,
   type Theme,
   type ToolbarItem,
-} from "../../../../web/previewer-sdk/src/index.ts";
+} from "@bnbloc/previewer-sdk";
 import { cellSize, isAtlasFile, parseAtlas, type AtlasFrame } from "./atlas.ts";
 
 /** The live-state shape shared with the room: which layers are on. */
