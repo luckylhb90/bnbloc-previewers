@@ -1,0 +1,287 @@
+/* Theme tokens: the host sends light|dark in preview.init. */
+:root {
+  --bg: #ffffff;
+  --fg: #1d1d1b;
+  --muted: #6b6b66;
+  --line: rgba(0, 0, 0, 0.1);
+  --accent: #0a74d9;
+  --missing: #d92d20;
+  --missing-bg: rgba(217, 45, 32, 0.1);
+  --partial: #b54708;
+  --full: #067647;
+  /* Set by main.ts: the loaded face, its variation settings, the zoom. */
+  --face: system-ui;
+  --fvs: normal;
+  --scale: 1;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: #161615;
+  --fg: #ededea;
+  --muted: #9a9a94;
+  --line: rgba(255, 255, 255, 0.12);
+  --accent: #4cc2ff;
+  --missing: #ff6b5e;
+  --missing-bg: rgba(255, 107, 94, 0.16);
+  --partial: #f5a524;
+  --full: #47cd89;
+  color-scheme: dark;
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--fg);
+  font: 12px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+#page {
+  height: 100vh;
+  overflow: auto;
+  padding: 20px 24px 40px;
+}
+#page[hidden] {
+  display: none;
+}
+/* Text in the font being previewed: a character it lacks falls back to the
+   system's, and nothing is synthesized (no fake bold or italic). */
+.face {
+  font-family: var(--face), system-ui, sans-serif;
+  font-variation-settings: var(--fvs);
+  font-synthesis: none;
+}
+h2 {
+  margin: 28px 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+#family {
+  margin: 0;
+  font-size: 44px;
+  font-weight: normal;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+#subtitle {
+  margin: 4px 0 12px;
+  color: var(--muted);
+  font-size: 14px;
+}
+#subtitle:empty {
+  display: none;
+}
+#facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 3px 14px;
+  margin: 0;
+}
+#facts dt {
+  color: var(--muted);
+}
+#facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+#facts dd.license {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+#coverage {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+#coverage li {
+  display: inline-flex;
+  gap: 6px;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+#coverage .count {
+  color: var(--muted);
+}
+#coverage li.full .script {
+  color: var(--full);
+}
+#coverage li.partial .script {
+  color: var(--partial);
+}
+#coverage li.none .script {
+  color: var(--missing);
+  text-decoration: line-through;
+}
+#note {
+  margin: 10px 0 0;
+  color: var(--muted);
+}
+#sliders {
+  display: grid;
+  gap: 6px;
+  max-width: 560px;
+}
+.axis {
+  display: grid;
+  grid-template-columns: 150px 1fr 48px max-content;
+  align-items: center;
+  gap: 10px;
+}
+.axis code {
+  color: var(--muted);
+  font-size: 11px;
+}
+.axis output {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.axis-range {
+  color: var(--muted);
+  font-size: 11px;
+}
+#instances {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+#instances[hidden] {
+  display: none;
+}
+#instances button,
+.pager button {
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+#instances button.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.pager button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+#sample {
+  display: block;
+  width: 100%;
+  max-width: 720px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg);
+  font: 13px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  resize: vertical;
+}
+#missing {
+  margin: 8px 0 0;
+  color: var(--missing);
+}
+.sample-row {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 12px;
+  padding: 12px 6px;
+  border-bottom: 1px solid var(--line);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.sample-row .size {
+  padding-top: 0.4em;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.sample-text {
+  line-height: 1.25;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+mark.missing {
+  background: var(--missing-bg);
+  color: inherit;
+  text-decoration: underline dotted var(--missing);
+  text-underline-offset: 0.15em;
+}
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  color: var(--muted);
+}
+.pager[hidden] {
+  display: none;
+}
+#glyph-range {
+  margin-left: 6px;
+  font-weight: normal;
+  text-transform: none;
+  letter-spacing: 0;
+}
+#grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+.glyph {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 2px 4px;
+  background: var(--bg);
+  cursor: pointer;
+  user-select: none;
+}
+.glyph .ch {
+  font-size: 30px;
+  line-height: 1.3;
+  white-space: pre;
+}
+.glyph .cp {
+  color: var(--muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+/* The part the Ask AI panel points at (lib/selection.ts). */
+.bnbloc-picked {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+#status {
+  position: fixed;
+  inset: auto 0 0 0;
+  margin: 0;
+  padding: 8px 12px;
+  color: var(--muted);
+  text-align: center;
+}
+#status:empty {
+  display: none;
+}
+#status.error {
+  color: var(--missing);
+  white-space: pre-wrap;
+  text-align: left;
+  background: var(--bg);
+  border-top: 1px solid var(--muted);
+}

@@ -1,0 +1,11 @@
+{
+  "name": "@bnbloc/previewer-font",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "samples": "node samples/generate.mjs",
+    "test": "node --test build.test.mjs"
+  }
+}

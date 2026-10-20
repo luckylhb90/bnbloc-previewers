@@ -15,10 +15,20 @@ sandboxed iframe with no network, and talks to bnbloc only through
 | `xlsx` | Excel | sheets with formats and merges, cell ranges picked by drag |
 | `mermaid` | `.mmd`, `.mermaid` | strict mode, a parse error shown with its line |
 | `drawio` | `.drawio`, `.dio` | every page as a tab, draw.io's own geometry |
+| `font` | `.ttf`, `.otf`, `.woff`, `.woff2` | a specimen: names and license, an editable sample with missing characters marked, variation-axis sliders, a glyph grid |
 
 All of them point (a click names what it is for the Ask AI panel) and offer
-units for Compare. How previewers work:
+units for Compare (the font previewer's units are the font's facts: names,
+axes, instances and script coverage). How previewers work:
 [previewer components](https://github.com/luckylhb90/bnbloc/blob/main/docs/architecture/previewer-components.md).
+
+The font previewer draws the font with `new FontFace(family, bytes)`: the
+file's own bytes, no fetch, so the frame's CSP has nothing to refuse. Its
+names, character map and axes come from its own reader of the `name`,
+`maxp`, `cmap` and `fvar` tables. WOFF2 tables are one Brotli stream, which
+WebKit (the desktop app on macOS, Safari) unpacks and Chromium does not: there
+a WOFF2 shows its format and table list, and its coverage and glyph list are
+found by drawing (marked approximate).
 
 ## Build
 

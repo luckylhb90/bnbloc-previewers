@@ -1,0 +1,25 @@
+{
+  "kind": "bnbloc.previewer.package/v1",
+  "contract": "bnbloc.previewer.contract/v1",
+  "runtime": "bundle",
+  "name": "font",
+  "version": "0.1.0",
+  "publisher": "bnbloc",
+  "description": "Fonts (.ttf, .otf, .woff, .woff2): family, version, designer and license, an editable sample at several sizes with the characters the font lacks marked, a slider per variation axis and the named instances, and a glyph grid whose glyphs a click names for the Ask AI panel.",
+  "artifacts": {
+    "bundle": { "url": "", "sha256": "" }
+  },
+  "previewer": {
+    "entry": "index.html",
+    "match": {
+      "mimeTypes": ["font/ttf", "font/otf", "font/woff", "font/woff2"],
+      "extensions": [".ttf", ".otf", ".woff", ".woff2"]
+    },
+    "rank": 50,
+    "capabilities": ["thumbnail", "toolbar", "selection", "units"],
+    "toolbar": [
+      { "id": "zoom", "icon": "zoom-in", "label": "Sample size", "kind": "zoom" },
+      { "id": "reset", "icon": "reload", "label": "Reset sample and axes", "kind": "button" }
+    ]
+  }
+}

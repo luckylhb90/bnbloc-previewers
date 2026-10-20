@@ -7,7 +7,7 @@
 // previewer itself (xlsx/src/main.ts).
 
 import { sendSelection } from "@bnbloc/previewer-sdk";
-import { selectionReporter as engineReporter, watchPointing as enginePointing, type Part } from "@bnbloc/previewer-sdk/pointing";
+import { selectionReporter as engineReporter, watchPointing as enginePointing, type Part, type PointingOptions } from "@bnbloc/previewer-sdk/pointing";
 
 export { FLASH, PICKED, blockText, collapseText, pendingReveal, quotedLabel, reveal, tableText, type Part } from "@bnbloc/previewer-sdk/pointing";
 
@@ -16,7 +16,8 @@ export function selectionReporter() {
   return engineReporter(sendSelection);
 }
 
-/** Reports the member's pointing inside root (see the engine). */
-export function watchPointing(root: HTMLElement, partOf: (el: Element) => Part | null): { reset(): void } {
-  return enginePointing(root, partOf, sendSelection);
+/** Reports the member's pointing inside root (see the engine; options name
+ *  the controls that are never parts, among others). */
+export function watchPointing(root: HTMLElement, partOf: (el: Element) => Part | null, options?: PointingOptions): { reset(): void } {
+  return enginePointing(root, partOf, sendSelection, options);
 }

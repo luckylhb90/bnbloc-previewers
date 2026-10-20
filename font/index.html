@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Font previewer</title>
+<!-- Font previewer (bnbloc.previewer.contract/v1). Runs in a sandboxed
+     opaque-origin frame: no inline script, no network, assets from the
+     bundle only; the font itself is loaded from the file's bytes
+     (FontFace), not fetched. -->
+<link rel="stylesheet" href="style.css">
+<script src="main.js" defer></script>
+</head>
+<body>
+<main id="page" aria-label="Font" hidden>
+  <header id="info">
+    <h1 id="family" class="face"></h1>
+    <p id="subtitle"></p>
+    <dl id="facts"></dl>
+    <ul id="coverage" aria-label="Script coverage"></ul>
+    <p id="note" hidden></p>
+  </header>
+  <section id="axes" aria-label="Variation axes" hidden>
+    <h2>Axes</h2>
+    <div id="sliders"></div>
+    <div id="instances" role="group" aria-label="Named instances"></div>
+  </section>
+  <section id="specimen" aria-label="Specimen">
+    <h2>Specimen</h2>
+    <textarea id="sample" rows="4" spellcheck="false" aria-label="Sample text"></textarea>
+    <p id="missing" hidden></p>
+    <div id="rows"></div>
+  </section>
+  <section id="glyphs" aria-label="Glyphs" hidden>
+    <h2>Glyphs <span id="glyph-range"></span></h2>
+    <nav class="pager" aria-label="Glyph pages"><button id="prev" type="button">‹ Previous</button><span id="page-label"></span><button id="next" type="button">Next ›</button></nav>
+    <div id="grid"></div>
+  </section>
+</main>
+<p id="status" role="status">Waiting for a file…</p>
+</body>
+</html>

@@ -22,7 +22,7 @@ jobs:
       - name: Collect
         run: |
           mkdir -p release
-          for p in sprite-sheet pptx docx xlsx mermaid drawio; do
+          for p in sprite-sheet pptx docx xlsx mermaid drawio font; do
             cp "$p/dist/bundle.tar" "release/$p-bundle.tar"
             cp "$p/dist/package.json" "release/$p-package.json"
           done
