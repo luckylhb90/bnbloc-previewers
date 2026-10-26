@@ -39,9 +39,53 @@ body {
 }
 #status {
   flex: 1;
+  min-width: 0;
   margin: 0;
   min-height: 1.4em;
   color: var(--muted);
+}
+#draft-box {
+  display: flex;
+  gap: 6px;
+  flex: 0 1 360px;
+  min-width: 0;
+}
+#prompt {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--fg);
+}
+#draft {
+  font: inherit;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+  white-space: nowrap;
+}
+#remove-draft {
+  font: inherit;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+  white-space: nowrap;
+}
+#remove-draft[hidden] {
+  display: none;
+}
+#draft:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 #status.error {
   color: var(--danger);

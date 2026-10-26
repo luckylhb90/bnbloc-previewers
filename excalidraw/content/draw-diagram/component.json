@@ -1,0 +1,33 @@
+{
+  "kind": "bnbloc.assist.package/v1",
+  "name": "draw-diagram",
+  "version": "1.0.0",
+  "displayName": "Draw a diagram",
+  "description": "Drafts the boxes and arrows of an Excalidraw diagram from one sentence the member types, for the drawing editor's Draft with AI.",
+  "category": "authoring",
+  "tags": ["assist", "diagrams", "excalidraw"],
+  "icon": "sparkle",
+  "output": "json",
+  "fields": [
+    { "name": "title", "description": "A short name for the diagram, at most 60 characters" },
+    {
+      "name": "nodes",
+      "description": "The boxes of the diagram, one item each",
+      "type": "items",
+      "item": [
+        { "name": "id", "description": "A short unique id for the box: n1, n2, n3 and so on" },
+        { "name": "label", "description": "What the box says, at most 60 characters" }
+      ]
+    },
+    {
+      "name": "edges",
+      "description": "The arrows between boxes, one item each",
+      "type": "items",
+      "item": [
+        { "name": "from", "description": "The id of the box the arrow starts at" },
+        { "name": "to", "description": "The id of the box the arrow points to" },
+        { "name": "label", "description": "What the arrow says, at most 40 characters; empty when it needs none" }
+      ]
+    }
+  ]
+}

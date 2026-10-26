@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 
 import { build } from "./build.mjs";
 import { assertBundle, readTar } from "../lib/bundle-check.mjs";
-import { MAX_ELEMENTS, readScene, selectionOf, unitsOf } from "./src/model.ts";
+import { MAX_DRAFT_EDGES, MAX_DRAFT_NODES, MAX_ELEMENTS, draftOrigin, layoutDraft, readDraft, readScene, selectionOf, unitsOf } from "./src/model.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const sample = (name) => readFile(join(HERE, "samples", name), "utf8");
@@ -32,7 +32,8 @@ test("the build produces a deterministic, parseable bundle with its notices and 
       files: a.files,
       toolbar: ["zoom", "fit"],
     });
-    assert.deepEqual(pkg.previewer.capabilities, ["thumbnail", "toolbar", "selection", "units", "edit"]);
+    assert.deepEqual(pkg.previewer.capabilities, ["thumbnail", "toolbar", "selection", "units", "edit", "draft"]);
+    assert.deepEqual(pkg.previewer.draft, { task: "draw-diagram" });
     assert.deepEqual(pkg.previewer.match.extensions, [".excalidraw", ".excalidraw.json"]);
     assert.deepEqual(pkg.previewer.match.mimeTypes, ["application/vnd.excalidraw+json"]);
 
@@ -140,4 +141,62 @@ test("the content packages are the platform's shapes", async () => {
   for (const p of prompts.prompts) {
     assert.ok(p.files.extensions.includes(".excalidraw"), `${p.id} is for .excalidraw files`);
   }
+});
+
+test("the draft task the previewer declares is the assist package it ships", async () => {
+  const pkg = JSON.parse(await readFile(join(HERE, "previewer.json"), "utf8"));
+  const assist = JSON.parse(await readFile(join(HERE, "content", "draw-diagram", "component.json"), "utf8"));
+  assert.equal(assist.kind, "bnbloc.assist.package/v1");
+  assert.equal(assist.name, pkg.previewer.draft.task);
+  assert.equal(assist.output, "json");
+  assert.deepEqual(assist.fields.map((f) => f.name), ["title", "nodes", "edges"]);
+});
+
+const reply = (nodes, edges = [], title = "Login") => ({ title, nodes, edges });
+const box = (id, label) => ({ id, label });
+
+test("a reply is read into a draft; an arrow that names no box is left out and counted", () => {
+  const d = readDraft(reply([box("a", "Enter password"), box("b", "Check")], [{ from: "a", to: "b", label: "submit" }, { from: "b", to: "zz" }]));
+  assert.equal(d.title, "Login");
+  assert.deepEqual(d.edges, [{ from: "a", to: "b", label: "submit" }]);
+  assert.equal(d.dropped, 1);
+});
+
+test("a reply that holds no diagram is refused with a sentence", () => {
+  assert.throws(() => readDraft("text"), /did not come back as a diagram/);
+  assert.throws(() => readDraft(reply([])), /has no boxes/);
+  assert.throws(() => readDraft(reply([box("a", "x"), box("a", "y")])), /same id/);
+  assert.throws(() => readDraft(reply([{ label: "no id" }])), /no id/);
+  const many = Array.from({ length: MAX_DRAFT_NODES + 1 }, (_, i) => box(`n${i}`, `box ${i}`));
+  assert.throws(() => readDraft(reply(many)), /at most 30 are drawn/);
+});
+
+test("arrows past the limit are counted, and labels are cut", () => {
+  const nodes = [box("a", "a".repeat(200)), box("b", "b")];
+  const edges = Array.from({ length: MAX_DRAFT_EDGES + 3 }, () => ({ from: "a", to: "b" }));
+  const d = readDraft(reply(nodes, edges));
+  assert.equal(d.edges.length, MAX_DRAFT_EDGES);
+  assert.equal(d.dropped, 3);
+  assert.ok(d.nodes[0].label.length <= 60);
+});
+
+test("a draft goes to the right of what the drawing holds, or at the origin when it is empty", async () => {
+  assert.deepEqual(draftOrigin([]), { x: 0, y: 0 });
+  const s = await flow();
+  // flow.excalidraw's right edge is the note box at x 80 + 260 wide, and the boxes at 420 + 180 = 600.
+  assert.deepEqual(draftOrigin(s.elements), { x: 760, y: 120 });
+});
+
+test("a draft lays out in columns by arrow depth, and a loop still places every box", () => {
+  const d = readDraft(reply([box("a", "Start"), box("b", "Middle"), box("c", "End")], [{ from: "a", to: "b" }, { from: "b", to: "c" }]));
+  const skeletons = layoutDraft(d, { x: 0, y: 0 });
+  const boxes = Object.fromEntries(skeletons.filter((k) => k.type === "rectangle").map((k) => [k.id, k]));
+  assert.ok(boxes["n-a"].x < boxes["n-b"].x && boxes["n-b"].x < boxes["n-c"].x, "columns follow the chain");
+  const arrow = skeletons.find((k) => k.type === "arrow");
+  assert.deepEqual(arrow.start, { id: "n-a" });
+  assert.deepEqual(arrow.end, { id: "n-b" });
+
+  const loop = readDraft(reply([box("a", "x"), box("b", "y")], [{ from: "a", to: "b" }, { from: "b", to: "a" }]));
+  const placed = layoutDraft(loop, { x: 0, y: 0 }).filter((k) => k.type === "rectangle");
+  assert.equal(placed.length, 2, "both boxes placed");
 });

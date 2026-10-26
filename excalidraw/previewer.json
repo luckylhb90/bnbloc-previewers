@@ -3,23 +3,51 @@
   "contract": "bnbloc.previewer.contract/v1",
   "runtime": "bundle",
   "name": "excalidraw",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "publisher": "bnbloc",
-  "description": "Excalidraw drawings (.excalidraw): drawn in the editor, edited and saved as new versions; point at a shape or an arrow to ask about it.",
+  "description": "Excalidraw drawings (.excalidraw): drawn in the editor, edited and saved as new versions, drafted from one sentence with AI; point at a shape or an arrow to ask about it.",
   "artifacts": {
-    "bundle": { "url": "", "sha256": "" }
+    "bundle": {
+      "url": "",
+      "sha256": ""
+    }
   },
   "previewer": {
     "entry": "index.html",
     "match": {
-      "mimeTypes": ["application/vnd.excalidraw+json"],
-      "extensions": [".excalidraw", ".excalidraw.json"]
+      "mimeTypes": [
+        "application/vnd.excalidraw+json"
+      ],
+      "extensions": [
+        ".excalidraw",
+        ".excalidraw.json"
+      ]
     },
     "rank": 50,
-    "capabilities": ["thumbnail", "toolbar", "selection", "units", "edit"],
+    "capabilities": [
+      "thumbnail",
+      "toolbar",
+      "selection",
+      "units",
+      "edit",
+      "draft"
+    ],
     "toolbar": [
-      { "id": "zoom", "icon": "zoom-in", "label": "Zoom", "kind": "zoom" },
-      { "id": "fit", "icon": "fit", "label": "Fit to view", "kind": "button" }
-    ]
+      {
+        "id": "zoom",
+        "icon": "zoom-in",
+        "label": "Zoom",
+        "kind": "zoom"
+      },
+      {
+        "id": "fit",
+        "icon": "fit",
+        "label": "Fit to view",
+        "kind": "button"
+      }
+    ],
+    "draft": {
+      "task": "draw-diagram"
+    }
   }
 }

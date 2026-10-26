@@ -7,11 +7,16 @@
 // version is refused, never merged). Ask AI works on what the member picked:
 // the selection is the picked elements, described with their text and their
 // connections (model.ts). Compare reads each labelled element as a unit.
+// Draft with AI: the footer asks the host for a diagram from one sentence; the
+// reply is laid out and added to the drawing as one undoable step, unsaved
+// until the member saves it (AI proposes, the member decides).
 // Thumbnail: the first render of the file.
 
 import {
   onFile,
   onInit,
+  onDrafted,
+  onDraftFailed,
   onReveal,
   onSaved,
   onSaveFailed,
@@ -19,6 +24,7 @@ import {
   onUnits,
   provideThumbnail,
   reportError,
+  requestDraft,
   savePreview,
   sendSelection,
   setTitle,
@@ -29,10 +35,12 @@ import {
 import { pendingReveal } from "../../lib/selection.ts";
 import { shortName } from "../../lib/office.ts";
 import { mountEditor, ZOOM_MAX, ZOOM_MIN, type Editor, type EditorState } from "./editor.tsx";
-import { readScene, selectionOf, unitsOf, type Scene } from "./model.ts";
+import { draftOrigin, layoutDraft, readDraft, readScene, selectionOf, unitsOf, type Scene } from "./model.ts";
 
 /** How long a save may wait for the host's answer before the frame says so. */
 const SAVE_TIMEOUT_MS = 10_000;
+/** How long a draft may wait for the host's answer before the frame says so. */
+const DRAFT_TIMEOUT_MS = 90_000;
 /** The summary line a save's version carries in the file's history. */
 const SAVE_SUMMARY = "Edited in the drawing editor";
 
@@ -45,6 +53,9 @@ function byId<T extends HTMLElement>(id: string): T {
 const editorEl = byId<HTMLElement>("editor");
 const statusEl = byId<HTMLElement>("status");
 const saveEl = byId<HTMLButtonElement>("save");
+const promptEl = byId<HTMLInputElement>("prompt");
+const draftEl = byId<HTMLButtonElement>("draft");
+const removeDraftEl = byId<HTMLButtonElement>("remove-draft");
 
 /** The line under the drawing: the last thing that happened (a load, a save,
  *  a refusal). It stays until the next save attempt, so a refusal is not lost
@@ -62,6 +73,11 @@ let savedVersion = -1;
 let sentVersion = -1;
 let saving = false;
 let saveTimer = 0;
+/** A draft is being written by the host; its timer says so if it never answers. */
+let drafting = false;
+let draftTimer = 0;
+/** The elements the last draft added: "Remove draft" takes exactly these out. */
+let lastDraft: string[] = [];
 let lastSelection = "";
 let lastZoom = -1;
 let thumbnailSent = false;
@@ -70,18 +86,25 @@ function dirty(): boolean {
   return loaded && touched && editor.version() !== savedVersion;
 }
 
-/** Paints the status line and enables Save for a loaded file with edits. A
+/** Paints the status line and enables Save and Draft as the state allows. A
  *  refusal (an error notice) stays on the line while the file has edits. */
 function render(): void {
   const changed = dirty();
-  saveEl.disabled = !loaded || saving || !changed;
+  saveEl.disabled = !loaded || saving || drafting || !changed;
+  draftEl.disabled = !loaded || saving || drafting || promptEl.value.trim() === "";
+  promptEl.disabled = drafting;
+  removeDraftEl.hidden = lastDraft.length === 0 || !loaded;
   let text = notice.text;
   let error = notice.error;
   if (saving) {
     text = "Saving…";
     error = false;
+  } else if (drafting) {
+    text = "Drafting with AI…";
+    error = false;
   } else if (changed && !error) {
-    text = "Unsaved changes. Save (Ctrl/⌘ S) to make them a new version.";
+    const hint = "Unsaved changes. Save (Ctrl/⌘ S) keeps them as a new version; Ctrl/⌘ Z undoes the last step.";
+    text = notice.text ? `${hint} ${notice.text}` : hint;
   }
   statusEl.textContent = text;
   statusEl.classList.toggle("error", error);
@@ -137,6 +160,7 @@ onFile((bytes, info) => {
   file = info;
   loaded = false;
   touched = false;
+  lastDraft = [];
   thumbnailSent = false;
   let scene: Scene;
   try {
@@ -202,6 +226,8 @@ onSaved((version) => {
   window.clearTimeout(saveTimer);
   saving = false;
   savedVersion = sentVersion;
+  // The draft is part of the saved version now: it is no longer a step to remove.
+  lastDraft = [];
   say(`Saved as v${version}.`);
 });
 
@@ -211,6 +237,72 @@ onSaveFailed((message) => {
   say(message, true);
 });
 
+/** Asks the host for a draft of the sentence in the footer. */
+function askDraft(): void {
+  const prompt = promptEl.value.trim();
+  if (!loaded || drafting || !prompt) return;
+  drafting = true;
+  notice = { text: "", error: false };
+  render();
+  draftTimer = window.setTimeout(() => {
+    if (!drafting) return;
+    drafting = false;
+    say("The draft did not answer. Try again.", true);
+  }, DRAFT_TIMEOUT_MS);
+  try {
+    requestDraft(prompt);
+  } catch (err) {
+    window.clearTimeout(draftTimer);
+    drafting = false;
+    say(err instanceof Error ? err.message : String(err), true);
+  }
+}
+
+onDrafted((reply) => {
+  window.clearTimeout(draftTimer);
+  drafting = false;
+  let draft;
+  try {
+    draft = readDraft(reply);
+  } catch (err) {
+    say(err instanceof Error ? err.message : String(err), true);
+    return;
+  }
+  if (!loaded) {
+    say("The file closed before the draft came back; nothing was added.", true);
+    return;
+  }
+  lastDraft = editor.addSkeletons(layoutDraft(draft, draftOrigin(editor.elements())));
+  if (lastDraft.length === 0) {
+    say("The drawing is not ready for a draft yet. Try again.", true);
+    return;
+  }
+  touched = true;
+  const left = draft.dropped > 0 ? ` ${draft.dropped} arrow${draft.dropped === 1 ? "" : "s"} named no box and were left out.` : "";
+  say(`Added a draft: ${draft.nodes.length} boxes, ${draft.edges.length} arrows.${left}`);
+});
+
+removeDraftEl.addEventListener("click", () => {
+  editor.removeElements(lastDraft);
+  lastDraft = [];
+  say("Removed the draft.");
+});
+
+onDraftFailed((message) => {
+  window.clearTimeout(draftTimer);
+  drafting = false;
+  say(message, true);
+});
+
+promptEl.addEventListener("input", () => render());
+// The frame's sandbox allows scripts but not forms, so a draft is a click or an
+// Enter key, never a form submit.
+draftEl.addEventListener("click", () => askDraft());
+promptEl.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  askDraft();
+});
 saveEl.addEventListener("click", () => save());
 // Ctrl/⌘ S saves; the browser's own save dialog is not offered in the frame.
 window.addEventListener(

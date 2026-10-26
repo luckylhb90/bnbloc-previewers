@@ -9,7 +9,9 @@
 import type { ComponentProps } from "react";
 import { createRoot } from "react-dom/client";
 import {
+  CaptureUpdateAction,
   Excalidraw,
+  convertToExcalidrawElements,
   exportToBlob,
   hashElementsVersion,
   restoreAppState,
@@ -49,6 +51,11 @@ export interface Editor {
   thumbnail(): Promise<Blob | null>;
   /** The live elements, read the way the model reads a file. */
   elements(): readonly SceneElement[];
+  /** Adds skeletons (boxes and arrows, see layoutDraft) to the drawing as one
+   *  undoable step; returns the ids of the elements it added. */
+  addSkeletons(skeletons: readonly Record<string, unknown>[]): string[];
+  /** Removes the elements with these ids as one undoable step (other edits stay). */
+  removeElements(ids: readonly string[]): void;
 }
 
 export function mountEditor(container: HTMLElement, onChange: (state: EditorState) => void): Editor {
@@ -137,6 +144,19 @@ export function mountEditor(container: HTMLElement, onChange: (state: EditorStat
     },
     elements() {
       return (api?.getSceneElements() ?? []) as unknown as readonly SceneElement[];
+    },
+    addSkeletons(skeletons) {
+      if (!api || skeletons.length === 0) return [];
+      // New ids: a second draft must not clash with the first one's ids.
+      const fresh = convertToExcalidrawElements(skeletons as never, { regenerateIds: true });
+      api.updateScene({ elements: [...api.getSceneElements(), ...fresh], captureUpdate: CaptureUpdateAction.IMMEDIATELY });
+      api.scrollToContent(fresh, { fitToContent: false, animate: true });
+      return fresh.map((el) => el.id);
+    },
+    removeElements(ids) {
+      if (!api || ids.length === 0) return;
+      const gone = new Set(ids);
+      api.updateScene({ elements: api.getSceneElements().filter((el) => !gone.has(el.id)), captureUpdate: CaptureUpdateAction.IMMEDIATELY });
     },
   };
 }

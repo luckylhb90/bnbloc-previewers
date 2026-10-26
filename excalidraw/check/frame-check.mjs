@@ -51,7 +51,7 @@ const hostHtml = `<!doctype html><meta charset="utf-8"><title>host</title>
   window.addEventListener("message", (ev) => {
     if (ev.source !== frame.contentWindow) return;
     const m = ev.data;
-    window.log.push({ type: m.type, ...(m.type === "preview.selection" ? { selection: m.selection } : {}),
+    window.log.push({ type: m.type, ...(m.type === "preview.draft" ? { prompt: m.prompt } : {}), ...(m.type === "preview.selection" ? { selection: m.selection } : {}),
       ...(m.type === "preview.save" ? { bytes: m.bytes.byteLength, summary: m.summary } : {}),
       ...(m.type === "preview.saved" ? {} : {}),
       ...(m.type === "preview.units" ? { units: m.units, error: m.error, truncated: m.truncated } : {}),
@@ -62,6 +62,13 @@ const hostHtml = `<!doctype html><meta charset="utf-8"><title>host</title>
     });
     if (m.type === "preview.save") window.lastSave = m;
     if (m.type === "preview.ready") window.loadFile();
+    // The host's assist answer: a canned diagram, or a refusal when the prompt says "fail".
+    if (m.type === "preview.draft") {
+      setTimeout(() => {
+        if (/fail/.test(m.prompt)) window.post({ type: "preview.draft.failed", message: "The drawing assistant is off in this organization." });
+        else window.post({ type: "preview.drafted", reply: { title: "Login", nodes: [{ id: "a", label: "Enter password" }, { id: "b", label: "Check password" }, { id: "c", label: "Signed in" }], edges: [{ from: "a", to: "b", label: "submit" }, { from: "b", to: "c", label: "match" }] } });
+      }, 200);
+    }
   });
   window.loadFile = () => {
     const bytes = window.fileBytes;
@@ -220,6 +227,30 @@ try {
   check("reveal selects the unit's element", revealed && revealed.label === "rectangle “Orders DB”", revealed && revealed.label);
 
   if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
+
+  // Draft with AI: the host's canned diagram is added as one undoable step, unsaved.
+  await frame.fill("#prompt", "Login with a password check");
+  check("draft button enabled with a sentence", !(await frame.isDisabled("#draft")));
+  await frame.click("#draft");
+  await page.waitForFunction(() => window.log.some((m) => m.type === "preview.draft"), null, { timeout: 5000 }).catch(() => {});
+  check("draft request reaches the host", await page.evaluate(() => window.log.some((m) => m.type === "preview.draft" && m.prompt === "Login with a password check")));
+  await frame.waitForFunction(() => /Added a draft/.test(document.getElementById("status").textContent), null, { timeout: 10000 }).catch(() => {});
+  const added = await frame.textContent("#status");
+  check("draft is added and says what it added", /Added a draft: 3 boxes, 2 arrows/.test(added), added);
+  check("draft leaves the file unsaved", !(await frame.isDisabled("#save")));
+  await frame.click("#remove-draft");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { window.lastSave = undefined; });
+  await frame.click("#save").catch(() => {});
+  await page.waitForFunction(() => window.lastSave !== undefined, null, { timeout: 8000 }).catch(() => {});
+  await page.evaluate(() => window.post({ type: "preview.saved", version: 3 }));
+  await page.waitForTimeout(200);
+  const undone = await page.evaluate(() => (window.lastSave ? JSON.parse(new TextDecoder().decode(window.lastSave.bytes)).elements.length : null));
+  check("remove draft takes the draft out (saved scene is the original seven elements)", undone === 7, undone);
+  await frame.fill("#prompt", "fail on purpose");
+  await frame.click("#draft");
+  await frame.waitForFunction(() => /assistant is off/.test(document.getElementById("status").textContent), null, { timeout: 8000 }).catch(() => {});
+  check("a refused draft says why", /assistant is off/.test(await frame.textContent("#status")), await frame.textContent("#status"));
 
   // Refusal: a non-scene file is refused with a sentence.
   await page.evaluate(() => {
