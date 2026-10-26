@@ -37,12 +37,22 @@ export interface SceneElement {
   readonly boundElements?: readonly { readonly id: string; readonly type: string }[] | null;
   readonly startBinding?: { readonly elementId: string } | null;
   readonly endBinding?: { readonly elementId: string } | null;
+  /** Drawing style, for the thumbnail. */
+  readonly strokeColor?: string;
+  readonly backgroundColor?: string;
+  readonly strokeWidth?: number;
+  readonly fontSize?: number;
+  readonly textAlign?: string;
+  readonly points?: readonly (readonly [number, number])[];
+  readonly endArrowhead?: string | null;
 }
 
 export interface Scene {
   readonly elements: readonly SceneElement[];
   readonly appState: Record<string, unknown>;
   readonly files: Record<string, unknown>;
+  /** Fields the reader filled in or fixed (see repairElement); 0 for a clean file. */
+  readonly repairs: number;
 }
 
 const NOUNS: Readonly<Record<string, string>> = {
@@ -92,17 +102,72 @@ export function readScene(text: string): Scene {
   if (value.elements.length > MAX_ELEMENTS) {
     throw new Error(`The drawing has ${value.elements.length.toLocaleString("en")} elements; at most ${MAX_ELEMENTS.toLocaleString("en")} are shown.`);
   }
+  let repairs = 0;
   const elements = value.elements.map((item, i): SceneElement => {
     if (!isRecord(item) || typeof item.id !== "string" || typeof item.type !== "string") {
       throw new Error(`Element ${i + 1} has no id or type.`);
     }
-    return item as unknown as SceneElement;
+    const fixed = repairElement(item);
+    repairs += fixed.changes;
+    return fixed.element as unknown as SceneElement;
   });
   return {
     elements,
     appState: isRecord(value.appState) ? value.appState : {},
     files: isRecord(value.files) ? value.files : {},
+    repairs,
   };
+}
+
+const LINEAR_TYPES: ReadonlySet<string> = new Set(["arrow", "line", "freedraw"]);
+
+function finite(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+/** Points are pairs of finite numbers, at least two of them. */
+function validPoints(value: unknown): boolean {
+  return Array.isArray(value) && value.length >= 2 && value.every((p) => Array.isArray(p) && p.length === 2 && finite(p[0]) && finite(p[1]));
+}
+
+/** A file an agent wrote is often almost right: an arrow with no points (the
+ *  editor throws on it and draws nothing), coordinates written as text, a text
+ *  with no font. Those are fixed here, and counted, so the drawing shows. */
+export function repairElement(raw: Record<string, unknown>): { readonly element: Record<string, unknown>; readonly changes: number } {
+  const el: Record<string, unknown> = { ...raw };
+  let changes = 0;
+  for (const key of ["x", "y", "width", "height", "angle"] as const) {
+    const v = el[key];
+    if (finite(v)) continue;
+    const parsed = typeof v === "string" ? Number(v) : NaN;
+    el[key] = finite(parsed) ? parsed : key === "angle" ? 0 : 0;
+    changes += 1;
+  }
+  if (LINEAR_TYPES.has(String(el.type)) && !validPoints(el.points)) {
+    const w = el.width as number;
+    const h = el.height as number;
+    el.points = w !== 0 || h !== 0 ? [[0, 0], [w, h]] : [[0, 0], [0, 0]];
+    changes += 1;
+  }
+  if (el.type === "text") {
+    if (typeof el.text !== "string") {
+      el.text = "";
+      changes += 1;
+    }
+    if (!finite(el.fontSize)) {
+      el.fontSize = 20;
+      changes += 1;
+    }
+    if (!finite(el.fontFamily)) {
+      el.fontFamily = 5;
+      changes += 1;
+    }
+  }
+  if (el.boundElements !== undefined && el.boundElements !== null && !Array.isArray(el.boundElements)) {
+    el.boundElements = null;
+    changes += 1;
+  }
+  return { element: el, changes };
 }
 
 /** The element's text: a text element's own, or the label bound inside it. */
@@ -152,6 +217,17 @@ function indexOf(elements: readonly SceneElement[]): Map<string, SceneElement> {
   return new Map(elements.map((el) => [el.id, el]));
 }
 
+/** The platform's word for what was picked (SELECTION_KINDS), which scopes the
+ *  suggestions the host offers: a text is `text`, a shape is `block`, an arrow, a
+ *  line, a drawing or several elements are an area, `region`. */
+export function kindOf(picked: readonly SceneElement[]): "text" | "block" | "region" {
+  if (picked.length !== 1) return "region";
+  const type = picked[0].type;
+  if (type === "text") return "text";
+  if (type === "rectangle" || type === "diamond" || type === "ellipse") return "block";
+  return "region";
+}
+
 /** What the member picked. Nothing selected is no selection (null: the chip
  *  is cleared). One element names it in full; several list their parts. */
 export function selectionOf(scene: Scene, selectedIds: readonly string[]): Selection | null {
@@ -173,7 +249,7 @@ export function selectionOf(scene: Scene, selectedIds: readonly string[]): Selec
     return {
       label: clip(describe(el, byId), SELECTION_LABEL_LIMIT),
       detail: clipLines(lines.join("\n"), SELECTION_DETAIL_LIMIT),
-      kind: "block",
+      kind: kindOf(picked),
       keys,
     };
   }
@@ -182,7 +258,7 @@ export function selectionOf(scene: Scene, selectedIds: readonly string[]): Selec
   return {
     label: `${picked.length} elements`,
     detail: clipLines(items.join("\n"), SELECTION_DETAIL_LIMIT),
-    kind: "block",
+    kind: kindOf(picked),
     keys,
   };
 }
@@ -228,6 +304,8 @@ const DRAFT_TITLE_LIMIT = 60;
 export interface DraftNode {
   readonly id: string;
   readonly label: string;
+  /** What the model said the box is; a decision is drawn as a diamond. */
+  readonly kind: "step" | "decision";
 }
 
 export interface DraftEdge {
@@ -243,14 +321,6 @@ export interface Draft {
   /** Arrows left out because an end named no box of the draft. */
   readonly dropped: number;
 }
-
-/** Layout of a draft, in CSS-free scene units (pixels). */
-export const DRAFT_GAP_X = 160;
-const DRAFT_COLUMN_GAP = 120;
-const DRAFT_ROW_GAP = 60;
-const DRAFT_BOX_HEIGHT = 80;
-const DRAFT_BOX_MIN = 160;
-const DRAFT_BOX_MAX = 280;
 
 /** A draft's text as the reply gave it: a string, cut to a limit. */
 function text(value: unknown, limit: number): string {
@@ -270,7 +340,11 @@ export function readDraft(value: unknown): Draft {
     const label = isRecord(item) ? text(item.label, DRAFT_NODE_LABEL_LIMIT) : "";
     if (!id || seen.has(id)) throw new Error("The draft has a box with no id, or two boxes with the same id. Try again.");
     seen.add(id);
-    nodes.push({ id, label: label || id });
+    const said = isRecord(item) ? text(item.kind, 20).toLowerCase() : "";
+    // The model says what a box is. Only when it did not (an older task) is a
+    // question mark, ASCII or full-width, taken as the sign of a decision.
+    const kind = said === "decision" || said === "step" ? said : /[?？]\s*$/.test(label) ? "decision" : "step";
+    nodes.push({ id, label: label || id, kind });
   }
   const edges: DraftEdge[] = [];
   let dropped = 0;
@@ -300,59 +374,149 @@ export function draftOrigin(elements: readonly SceneElement[]): { readonly x: nu
   return { x: Math.round(right + DRAFT_GAP_X), y: Math.round(top) };
 }
 
-/** Element skeletons for convertToExcalidrawElements: boxes with their labels,
- *  and arrows bound to them. The boxes sit in columns by arrow depth (a box
- *  reached by a longer chain of arrows goes further right); a loop is cut where
- *  it closes, so every box gets a column. */
+/** Layout of a draft, in scene pixels: a flow reads top to bottom. */
+export const DRAFT_GAP_X = 160;
+const DRAFT_ROW_GAP = 100;
+const DRAFT_COL_GAP = 70;
+const DRAFT_BOX_H = 80;
+const DRAFT_DIAMOND_H = 120;
+const DRAFT_BOX_MIN = 160;
+const DRAFT_BOX_MAX = 260;
+const DRAFT_DIAMOND_MIN = 200;
+const DRAFT_DIAMOND_MAX = 300;
+const DRAFT_LOOP_CHANNEL = 70;
+
+/** Element skeletons for convertToExcalidrawElements: the boxes (decisions are
+ *  diamonds) in rows by arrow depth, ordered to reduce crossings, and the arrows
+ *  bound to them. A forward arrow runs straight down, or through a channel
+ *  between rows when it skips a row. An arrow that loops back runs out to the
+ *  left of the drawing and in again, so it never crosses a box. */
 export function layoutDraft(draft: Draft, origin: { readonly x: number; readonly y: number }): Record<string, unknown>[] {
-  const depth = new Map<string, number>(draft.nodes.map((n) => [n.id, 0]));
-  // Longest path by relaxation, bounded by the box count so a loop stops.
-  for (let round = 0; round < draft.nodes.length; round++) {
+  const ids = draft.nodes.map((n) => n.id);
+  const byId = new Map(draft.nodes.map((n) => [n.id, n]));
+  const edges = draft.edges;
+
+  // Back edges: a depth-first walk finds the arrows that close a loop.
+  const backEdges = new Set<number>();
+  const state = new Map<string, 1 | 2>();
+  const visit = (u: string): void => {
+    state.set(u, 1);
+    edges.forEach((e, ei) => {
+      if (e.from !== u) return;
+      const s = state.get(e.to);
+      if (s === 1) backEdges.add(ei);
+      else if (s === undefined) visit(e.to);
+    });
+    state.set(u, 2);
+  };
+  for (const id of ids) if (!state.has(id)) visit(id);
+
+  // Rows: the longest chain of forward arrows into each box.
+  const row = new Map(ids.map((id) => [id, 0]));
+  for (let round = 0; round < ids.length; round++) {
     let changed = false;
-    for (const edge of draft.edges) {
-      const next = (depth.get(edge.from) ?? 0) + 1;
-      if (next > (depth.get(edge.to) ?? 0) && next < draft.nodes.length) {
-        depth.set(edge.to, next);
+    edges.forEach((e, ei) => {
+      if (backEdges.has(ei)) return;
+      const next = (row.get(e.from) ?? 0) + 1;
+      if (next > (row.get(e.to) ?? 0)) {
+        row.set(e.to, next);
         changed = true;
       }
-    }
+    });
     if (!changed) break;
   }
-  const widths = new Map(draft.nodes.map((n) => [n.id, Math.min(DRAFT_BOX_MAX, Math.max(DRAFT_BOX_MIN, 10 * n.label.length + 40))]));
-  const columns: DraftNode[][] = [];
-  for (const node of draft.nodes) {
-    const d = depth.get(node.id) ?? 0;
-    (columns[d] ??= []).push(node);
+  const rowCount = Math.max(...ids.map((id) => row.get(id) ?? 0)) + 1;
+  const rows: string[][] = Array.from({ length: rowCount }, () => []);
+  for (const id of ids) rows[row.get(id) ?? 0].push(id);
+
+  // Order within a row by the average position of the boxes it connects to
+  // (barycentre), down and up, a few passes: fewer crossings.
+  const forward = edges.filter((_, ei) => !backEdges.has(ei));
+  const position = new Map<string, number>();
+  const refresh = () => rows.forEach((r) => r.forEach((id, i) => position.set(id, i)));
+  const orderBy = (r: string[], neighbours: (id: string) => number[]) => {
+    const bary = new Map(r.map((id, i) => {
+      const ns = neighbours(id);
+      return [id, ns.length ? ns.reduce((a, b) => a + b, 0) / ns.length : i] as const;
+    }));
+    r.sort((a, b) => (bary.get(a) ?? 0) - (bary.get(b) ?? 0));
+  };
+  refresh();
+  for (let pass = 0; pass < 3; pass++) {
+    for (let r = 1; r < rowCount; r++) {
+      orderBy(rows[r], (id) => forward.filter((e) => e.to === id).map((e) => position.get(e.from) ?? 0));
+      refresh();
+    }
+    for (let r = rowCount - 2; r >= 0; r--) {
+      orderBy(rows[r], (id) => forward.filter((e) => e.from === id).map((e) => position.get(e.to) ?? 0));
+      refresh();
+    }
   }
+
+  // Sizes and places.
+  const size = new Map(draft.nodes.map((n) => {
+    const decision = n.kind === "decision";
+    const w = decision
+      ? Math.min(DRAFT_DIAMOND_MAX, Math.max(DRAFT_DIAMOND_MIN, 9 * n.label.length + 60))
+      : Math.min(DRAFT_BOX_MAX, Math.max(DRAFT_BOX_MIN, 9 * n.label.length + 40));
+    return [n.id, { w, h: decision ? DRAFT_DIAMOND_H : DRAFT_BOX_H, decision }] as const;
+  }));
+  const rowWidth = (r: string[]) => r.reduce((sum, id) => sum + (size.get(id)?.w ?? 0), 0) + DRAFT_COL_GAP * Math.max(0, r.length - 1);
+  const widest = Math.max(...rows.map(rowWidth));
+  const left = origin.x + (backEdges.size > 0 ? DRAFT_LOOP_CHANNEL : 0);
   const place = new Map<string, { x: number; y: number; w: number; h: number }>();
-  let x = origin.x;
-  columns.forEach((column) => {
-    const colWidth = Math.max(...column.map((n) => widths.get(n.id) ?? DRAFT_BOX_MIN));
-    column.forEach((node, row) => {
-      const w = widths.get(node.id) ?? DRAFT_BOX_MIN;
-      place.set(node.id, { x: x + Math.round((colWidth - w) / 2), y: origin.y + row * (DRAFT_BOX_HEIGHT + DRAFT_ROW_GAP), w, h: DRAFT_BOX_HEIGHT });
-    });
-    x += colWidth + DRAFT_COLUMN_GAP;
-  });
+  let top = origin.y;
+  for (const r of rows) {
+    const rowH = Math.max(0, ...r.map((id) => size.get(id)?.h ?? 0));
+    let x = left + (widest - rowWidth(r)) / 2;
+    for (const id of r) {
+      const s = size.get(id)!;
+      place.set(id, { x, y: top + (rowH - s.h) / 2, w: s.w, h: s.h });
+      x += s.w + DRAFT_COL_GAP;
+    }
+    top += rowH + DRAFT_ROW_GAP;
+  }
+  const rowTop = (r: number) => origin.y + rows.slice(0, r).reduce((sum, rr) => sum + Math.max(0, ...rr.map((id) => size.get(id)?.h ?? 0)) + DRAFT_ROW_GAP, 0);
 
   const boxes = draft.nodes.map((node) => {
     const p = place.get(node.id)!;
-    return { type: "rectangle", id: `n-${node.id}`, x: p.x, y: p.y, width: p.w, height: p.h, label: { text: node.label, fontSize: 20 } };
+    const s = size.get(node.id)!;
+    return { type: s.decision ? "diamond" : "rectangle", id: `n-${node.id}`, x: p.x, y: p.y, width: p.w, height: p.h, label: { text: byId.get(node.id)?.label ?? node.id, fontSize: 20 } };
   });
-  const arrows = draft.edges.map((edge, i) => {
+
+  let loop = 0;
+  const arrows = edges.map((edge, i) => {
     const a = place.get(edge.from)!;
     const b = place.get(edge.to)!;
-    const start = { x: a.x + a.w, y: a.y + a.h / 2 };
-    const end = { x: b.x, y: b.y + b.h / 2 };
+    const down = (p: { x: number; y: number; w: number; h: number }) => ({ x: p.x + p.w / 2, y: p.y + p.h });
+    const up = (p: { x: number; y: number; w: number; h: number }) => ({ x: p.x + p.w / 2, y: p.y });
+    const sideLeft = (p: { x: number; y: number; w: number; h: number }) => ({ x: p.x, y: p.y + p.h / 2 });
+    let path: { x: number; y: number }[];
+    if (backEdges.has(i)) {
+      // Down from the source, along the gap under its row, up the channel left of
+      // every box, and into the target's left side: no box is crossed.
+      const channel = origin.x + 24 - 18 * (loop++);
+      const from = down(a);
+      const under = rowTop((row.get(edge.from) ?? 0) + 1) - DRAFT_ROW_GAP / 2;
+      const to = sideLeft(b);
+      path = [from, { x: from.x, y: under }, { x: channel, y: under }, { x: channel, y: to.y }, to];
+    } else {
+      const from = down(a);
+      const to = up(b);
+      if ((row.get(edge.to) ?? 0) > (row.get(edge.from) ?? 0) + 1) {
+        const channelY = rowTop(row.get(edge.to) ?? 0) - DRAFT_ROW_GAP / 2;
+        path = [from, { x: from.x, y: channelY }, { x: to.x, y: channelY }, to];
+      } else {
+        path = [from, to];
+      }
+    }
+    const origin0 = path[0];
     const arrow: Record<string, unknown> = {
       type: "arrow",
       id: `a-${i}`,
-      x: start.x,
-      y: start.y,
-      points: [
-        [0, 0],
-        [end.x - start.x, end.y - start.y],
-      ],
+      x: origin0.x,
+      y: origin0.y,
+      points: path.map((p) => [p.x - origin0.x, p.y - origin0.y]),
       start: { id: `n-${edge.from}` },
       end: { id: `n-${edge.to}` },
     };
@@ -360,4 +524,53 @@ export function layoutDraft(draft: Draft, origin: { readonly x: number; readonly
     return arrow;
   });
   return [...boxes, ...arrows];
+}
+
+// --- Thumbnail and selection geometry ---------------------------------------
+
+export interface Box {
+  readonly x: number;
+  readonly y: number;
+  readonly w: number;
+  readonly h: number;
+}
+
+/** The scene box an element covers: its frame, or for a line or an arrow the
+ *  points it runs through (an arrow's frame alone misses its bends). */
+export function elementBox(el: SceneElement): Box {
+  const x = el.x ?? 0;
+  const y = el.y ?? 0;
+  if (el.points && el.points.length > 0) {
+    const xs = el.points.map((p) => x + p[0]);
+    const ys = el.points.map((p) => y + p[1]);
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    return { x: minX, y: minY, w: Math.max(...xs) - minX, h: Math.max(...ys) - minY };
+  }
+  return { x, y, w: el.width ?? 0, h: el.height ?? 0 };
+}
+
+/** The box that covers every live element; null for an empty drawing. */
+export function sceneBox(elements: readonly SceneElement[]): Box | null {
+  const live = elements.filter((el) => !el.isDeleted);
+  if (live.length === 0) return null;
+  const boxes = live.map(elementBox);
+  const minX = Math.min(...boxes.map((b) => b.x));
+  const minY = Math.min(...boxes.map((b) => b.y));
+  const maxX = Math.max(...boxes.map((b) => b.x + b.w));
+  const maxY = Math.max(...boxes.map((b) => b.y + b.h));
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+}
+
+/** How to fit a scene box into a canvas: a uniform scale and the offset that
+ *  centres it, with a margin on every side. */
+export function coverFit(box: Box, width: number, height: number, margin: number): { scale: number; dx: number; dy: number } {
+  const availW = Math.max(1, width - 2 * margin);
+  const availH = Math.max(1, height - 2 * margin);
+  const scale = Math.min(availW / Math.max(1, box.w), availH / Math.max(1, box.h), 1);
+  return {
+    scale,
+    dx: margin + (availW - box.w * scale) / 2 - box.x * scale,
+    dy: margin + (availH - box.h * scale) / 2 - box.y * scale,
+  };
 }

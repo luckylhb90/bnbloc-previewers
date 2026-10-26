@@ -12,22 +12,20 @@ import {
   CaptureUpdateAction,
   Excalidraw,
   convertToExcalidrawElements,
-  exportToBlob,
   hashElementsVersion,
   restoreAppState,
   restoreElements,
+  sceneCoordsToViewportCoords,
   serializeAsJSON,
 } from "@excalidraw/excalidraw";
 
-import type { Scene, SceneElement } from "./model.ts";
+import { sceneBox, type Scene, type SceneElement } from "./model.ts";
 
 type ExcalidrawAPI = Parameters<NonNullable<ComponentProps<typeof Excalidraw>["excalidrawAPI"]>>[0];
 
 /** Zoom limits the toolbar may ask for. */
 export const ZOOM_MIN = 0.1;
 export const ZOOM_MAX = 4;
-/** Blank space around a thumbnail's drawing, in pixels. */
-const THUMBNAIL_PADDING = 16;
 
 export interface EditorState {
   /** The scene's version: changes with every edit, the same for the same scene. */
@@ -43,12 +41,15 @@ export interface Editor {
   fit(): void;
   /** Selects the element and brings it into view. */
   reveal(id: string): void;
+  /** Redraws the scene (text drawn before its font loaded is drawn again). */
+  refresh(): void;
   /** The file's bytes as the editor writes them (an .excalidraw JSON). */
   serialize(): string;
   /** The scene's version now (compare with a saved version to see an edit). */
   version(): number;
-  /** The drawing as a PNG with its padding, or null when there is nothing to draw. */
-  thumbnail(): Promise<Blob | null>;
+  /** The box the given elements cover, in viewport pixels (the frame's own box);
+   *  null when none of them is in the drawing. */
+  selectionRect(ids: readonly string[]): { readonly x: number; readonly y: number; readonly w: number; readonly h: number } | null;
   /** The live elements, read the way the model reads a file. */
   elements(): readonly SceneElement[];
   /** Adds skeletons (boxes and arrows, see layoutDraft) to the drawing as one
@@ -84,8 +85,11 @@ export function mountEditor(container: HTMLElement, onChange: (state: EditorStat
     <Excalidraw
       excalidrawAPI={(next) => {
         api = next;
-        if (pending) apply(pending.scene, pending.loaded);
+        // Not during the mount: the editor finishes mounting after this call, and
+        // a scene set inside it is cleared (seen in WebKit, the desktop engine).
+        const waiting = pending;
         pending = null;
+        if (waiting) window.setTimeout(() => apply(waiting.scene, waiting.loaded), 0);
       }}
       theme="light"
       langCode="en"
@@ -116,6 +120,9 @@ export function mountEditor(container: HTMLElement, onChange: (state: EditorStat
     fit() {
       api?.scrollToContent(undefined, { fitToContent: true, animate: false });
     },
+    refresh() {
+      api?.refresh();
+    },
     reveal(id) {
       if (!api) return;
       const el = api.getSceneElements().find((e) => e.id === id && !e.isDeleted);
@@ -130,17 +137,16 @@ export function mountEditor(container: HTMLElement, onChange: (state: EditorStat
     version() {
       return state().version;
     },
-    async thumbnail() {
-      if (!api) return null;
-      const elements = api.getSceneElements().filter((e) => !e.isDeleted);
-      if (elements.length === 0) return null;
-      return exportToBlob({
-        elements,
-        appState: { viewBackgroundColor: api.getAppState().viewBackgroundColor } as never,
-        files: api.getFiles(),
-        mimeType: "image/png",
-        exportPadding: THUMBNAIL_PADDING,
-      });
+    selectionRect(ids) {
+      if (!api || ids.length === 0) return null;
+      const picked = api.getSceneElements().filter((e) => !e.isDeleted && ids.includes(e.id));
+      const box = sceneBox(picked as unknown as SceneElement[]);
+      if (!box) return null;
+      const app = api.getAppState();
+      const view = { zoom: app.zoom, offsetLeft: app.offsetLeft, offsetTop: app.offsetTop, scrollX: app.scrollX, scrollY: app.scrollY };
+      const a = sceneCoordsToViewportCoords({ sceneX: box.x, sceneY: box.y }, view);
+      const b = sceneCoordsToViewportCoords({ sceneX: box.x + box.w, sceneY: box.y + box.h }, view);
+      return { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y };
     },
     elements() {
       return (api?.getSceneElements() ?? []) as unknown as readonly SceneElement[];
@@ -150,7 +156,8 @@ export function mountEditor(container: HTMLElement, onChange: (state: EditorStat
       // New ids: a second draft must not clash with the first one's ids.
       const fresh = convertToExcalidrawElements(skeletons as never, { regenerateIds: true });
       api.updateScene({ elements: [...api.getSceneElements(), ...fresh], captureUpdate: CaptureUpdateAction.IMMEDIATELY });
-      api.scrollToContent(fresh, { fitToContent: false, animate: true });
+      // Show the whole draft: fit to the new elements, not just bring one into view.
+      api.scrollToContent(fresh, { fitToContent: true, animate: true });
       return fresh.map((el) => el.id);
     },
     removeElements(ids) {

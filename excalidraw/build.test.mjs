@@ -6,6 +6,7 @@
 // the Compare units; and the content packages against the platform's shapes.
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -14,7 +15,7 @@ import { fileURLToPath } from "node:url";
 
 import { build } from "./build.mjs";
 import { assertBundle, readTar } from "../lib/bundle-check.mjs";
-import { MAX_DRAFT_EDGES, MAX_DRAFT_NODES, MAX_ELEMENTS, draftOrigin, layoutDraft, readDraft, readScene, selectionOf, unitsOf } from "./src/model.ts";
+import { MAX_DRAFT_EDGES, MAX_DRAFT_NODES, MAX_ELEMENTS, coverFit, draftOrigin, elementBox, kindOf, layoutDraft, readDraft, readScene, sceneBox, selectionOf, unitsOf } from "./src/model.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const sample = (name) => readFile(join(HERE, "samples", name), "utf8");
@@ -187,16 +188,93 @@ test("a draft goes to the right of what the drawing holds, or at the origin when
   assert.deepEqual(draftOrigin(s.elements), { x: 760, y: 120 });
 });
 
-test("a draft lays out in columns by arrow depth, and a loop still places every box", () => {
-  const d = readDraft(reply([box("a", "Start"), box("b", "Middle"), box("c", "End")], [{ from: "a", to: "b" }, { from: "b", to: "c" }]));
-  const skeletons = layoutDraft(d, { x: 0, y: 0 });
-  const boxes = Object.fromEntries(skeletons.filter((k) => k.type === "rectangle").map((k) => [k.id, k]));
-  assert.ok(boxes["n-a"].x < boxes["n-b"].x && boxes["n-b"].x < boxes["n-c"].x, "columns follow the chain");
-  const arrow = skeletons.find((k) => k.type === "arrow");
-  assert.deepEqual(arrow.start, { id: "n-a" });
-  assert.deepEqual(arrow.end, { id: "n-b" });
+test("a draft flows top to bottom in rows; no two boxes overlap", () => {
+  const d = readDraft(reply([box("a", "Start"), box("b", "Middle"), box("c", "End"), box("d", "Other branch")], [{ from: "a", to: "b" }, { from: "b", to: "c" }, { from: "a", to: "d" }]));
+  const boxes = layoutDraft(d, { x: 0, y: 0 }).filter((k) => k.type === "rectangle" || k.type === "diamond");
+  const byId = Object.fromEntries(boxes.map((k) => [k.id, k]));
+  assert.ok(byId["n-a"].y < byId["n-b"].y && byId["n-b"].y < byId["n-c"].y, "later steps sit lower");
+  assert.equal(byId["n-b"].y, byId["n-d"].y, "siblings share a row");
+  for (const p of boxes) for (const q of boxes) {
+    if (p === q) continue;
+    const overlap = p.x < q.x + q.width && q.x < p.x + p.width && p.y < q.y + q.height && q.y < p.y + p.height;
+    assert.equal(overlap, false, `${p.id} and ${q.id} overlap`);
+  }
+  const arrows = layoutDraft(d, { x: 0, y: 0 }).filter((k) => k.type === "arrow");
+  assert.deepEqual(arrows.find((k) => k.id === "a-0").start, { id: "n-a" });
+});
 
-  const loop = readDraft(reply([box("a", "x"), box("b", "y")], [{ from: "a", to: "b" }, { from: "b", to: "a" }]));
-  const placed = layoutDraft(loop, { x: 0, y: 0 }).filter((k) => k.type === "rectangle");
-  assert.equal(placed.length, 2, "both boxes placed");
+test("a question is a diamond; a loop back runs outside the boxes", () => {
+  const d = readDraft(reply([box("a", "Password correct?"), box("b", "Login"), box("c", "Try again")], [{ from: "a", to: "b", label: "Yes" }, { from: "a", to: "c", label: "No" }, { from: "c", to: "a" }]));
+  const sk = layoutDraft(d, { x: 0, y: 0 });
+  assert.equal(sk.find((k) => k.id === "n-a").type, "diamond");
+  assert.equal(sk.find((k) => k.id === "n-b").type, "rectangle");
+  const back = sk.find((k) => k.id === "a-2");
+  assert.equal(back.points.length, 5, "a loop back is routed under its row and up a channel");
+  const boxes = sk.filter((k) => k.type !== "arrow");
+  const leftmost = Math.min(...boxes.map((k) => k.x));
+  const channelX = back.x + back.points[2][0];
+  assert.ok(channelX < leftmost, "the channel is left of every box");
+});
+
+test("the model says which box is a decision; without it, a question mark of either width does", () => {
+  const said = readDraft(reply([{ id: "a", label: "Check the password", kind: "decision" }, { id: "b", label: "Is it right?", kind: "step" }]));
+  assert.deepEqual(said.nodes.map((n) => n.kind), ["decision", "step"], "the model's word wins over the punctuation");
+  const guessed = readDraft(reply([box("a", "Is it ok?"), box("b", "密码正确？"), box("c", "Send it")]));
+  assert.deepEqual(guessed.nodes.map((n) => n.kind), ["decision", "decision", "step"], "an unmarked box falls back to a trailing ? or ？");
+  const sk = layoutDraft(said, { x: 0, y: 0 });
+  assert.equal(sk.find((k) => k.id === "n-a").type, "diamond");
+  assert.equal(sk.find((k) => k.id === "n-b").type, "rectangle");
+});
+
+test("an arrow that skips a row goes through a channel between the rows", () => {
+  const d = readDraft(reply([box("a", "A"), box("b", "B"), box("c", "C")], [{ from: "a", to: "b" }, { from: "b", to: "c" }, { from: "a", to: "c" }]));
+  const skip = layoutDraft(d, { x: 0, y: 0 }).find((k) => k.id === "a-2");
+  assert.equal(skip.points.length, 4);
+});
+
+test("an arrow an agent left without points is repaired, not dropped; the repairs are counted", async () => {
+  const doc = JSON.parse(readFileSync(join(HERE, "samples", "flow.excalidraw"), "utf8"));
+  for (const el of doc.elements) if (el.type === "arrow") delete el.points;
+  const s = readScene(JSON.stringify(doc));
+  const arrow = s.elements.find((el) => el.type === "arrow");
+  assert.deepEqual(arrow.points, [[0, 0], [160, 0]], "points from the arrow's size");
+  assert.equal(s.repairs, 1);
+  assert.equal(readScene(await sample("flow.excalidraw")).repairs, 0, "a clean file needs no repairs");
+});
+
+test("coordinates written as text are read as numbers, and a text with no font gets the default", () => {
+  const doc = { type: "excalidraw", elements: [
+    { id: "a", type: "rectangle", x: "80", y: "120", width: "180", height: 80 },
+    { id: "t", type: "text", x: 10, y: 10, width: 50, height: 20 },
+  ] };
+  const s = readScene(JSON.stringify(doc));
+  assert.deepEqual([s.elements[0].x, s.elements[0].y, s.elements[0].width], [80, 120, 180]);
+  assert.equal(s.elements[1].text, "");
+  assert.equal(s.elements[1].fontSize, 20);
+  assert.equal(s.elements[1].fontFamily, 5);
+  assert.ok(s.repairs >= 4);
+});
+
+test("the thumbnail frames the whole drawing: arrows count by their bends, and the fit keeps the aspect", () => {
+  const arrow = { id: "a", type: "arrow", x: 10, y: 10, width: 0, height: 0, points: [[0, 0], [100, 0], [100, 80]] };
+  assert.deepEqual(elementBox(arrow), { x: 10, y: 10, w: 100, h: 80 });
+  const box = sceneBox([arrow, { id: "r", type: "rectangle", x: 0, y: 0, width: 20, height: 20 }]);
+  assert.deepEqual(box, { x: 0, y: 0, w: 110, h: 90 });
+  assert.equal(sceneBox([{ id: "d", type: "rectangle", x: 0, y: 0, width: 5, height: 5, isDeleted: true }]), null);
+  const fit = coverFit({ x: 0, y: 0, w: 400, h: 200 }, 480, 300, 16);
+  assert.equal(fit.scale, 1, "a drawing smaller than the card is not enlarged past 100%");
+  const wide = coverFit({ x: 0, y: 0, w: 4000, h: 200 }, 480, 300, 16);
+  assert.ok(Math.abs(wide.scale - 448 / 4000) < 1e-9, "a wide drawing fits the width");
+});
+
+test("the selection kind follows what was picked: a text, a shape, an arrow or several", async () => {
+  const sc = await flow();
+  const kinds = (ids) => selectionOf(sc, ids).kind;
+  assert.equal(kinds(["api"]), "block", "a rectangle is a block");
+  assert.equal(kinds(["api-label"]), "text", "a text is text");
+  assert.equal(kinds(["arrow-1"]), "region", "an arrow is an area");
+  assert.equal(kinds(["api", "db"]), "region", "several elements are an area");
+  assert.equal(kindOf([{ id: "d", type: "diamond" }]), "block");
+  assert.equal(kindOf([{ id: "e", type: "ellipse" }]), "block");
+  assert.equal(kindOf([{ id: "l", type: "line" }]), "region");
 });

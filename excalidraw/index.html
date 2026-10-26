@@ -16,12 +16,14 @@
 <main id="editor" aria-label="Drawing"></main>
 <footer id="bar">
   <p id="status" role="status"></p>
-  <div id="draft-box">
-    <input id="prompt" type="text" maxlength="1000" placeholder="Describe a diagram to draft with AI" aria-label="Describe a diagram to draft with AI">
-    <button id="draft" type="button" disabled>Draft with AI</button>
-    <button id="remove-draft" type="button" hidden>Remove draft</button>
+  <div id="actions">
+    <div id="draft-box">
+      <input id="prompt" type="text" maxlength="1000" placeholder="Describe a diagram to draft with AI" aria-label="Describe a diagram to draft with AI">
+      <button id="draft" type="button" disabled>Draft with AI</button>
+      <button id="remove-draft" type="button" hidden>Remove draft</button>
+    </div>
+    <button id="save" type="button" disabled>Save</button>
   </div>
-  <button id="save" type="button" disabled>Save</button>
 </footer>
 </body>
 </html>

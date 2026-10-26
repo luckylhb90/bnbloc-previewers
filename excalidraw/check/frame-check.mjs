@@ -17,12 +17,13 @@
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import { join, extname } from "node:path";
-import { chromium } from "playwright-core";
+import { chromium, webkit } from "playwright-core";
+import { writeFile } from "node:fs/promises";
 
 const SITE = process.argv[2];
 const SAMPLE = process.argv[3];
 const CHROME = process.env.CHROME_PATH;
-if (!CHROME) throw new Error("set CHROME_PATH to a Chromium binary");
+if (!CHROME && process.env.ENGINE !== "webkit") throw new Error("set CHROME_PATH to a Chromium binary, or ENGINE=webkit with WEBKIT_PATH");
 const HOST_PORT = 4100;
 const FRAME_PORT = 4101;
 const FRAME_BASE = `http://localhost:${FRAME_PORT}/frame/`;
@@ -61,12 +62,13 @@ const hostHtml = `<!doctype html><meta charset="utf-8"><title>host</title>
       ...(m.type === "preview.save.failed" ? { message: m.message } : {}),
     });
     if (m.type === "preview.save") window.lastSave = m;
+    if (m.type === "preview.thumbnail") window.thumbPng = m.png;
     if (m.type === "preview.ready") window.loadFile();
     // The host's assist answer: a canned diagram, or a refusal when the prompt says "fail".
     if (m.type === "preview.draft") {
       setTimeout(() => {
         if (/fail/.test(m.prompt)) window.post({ type: "preview.draft.failed", message: "The drawing assistant is off in this organization." });
-        else window.post({ type: "preview.drafted", reply: { title: "Login", nodes: [{ id: "a", label: "Enter password" }, { id: "b", label: "Check password" }, { id: "c", label: "Signed in" }], edges: [{ from: "a", to: "b", label: "submit" }, { from: "b", to: "c", label: "match" }] } });
+        else window.post({ type: "preview.drafted", reply: window.cannedReply ?? { title: "Login", nodes: [{ id: "a", label: "Enter password" }, { id: "b", label: "Check password" }, { id: "c", label: "Signed in" }], edges: [{ from: "a", to: "b", label: "submit" }, { from: "b", to: "c", label: "match" }] } });
       }, 200);
     }
   });
@@ -120,13 +122,18 @@ const hostServer = createServer(async (req, res) => {
 });
 await new Promise((r) => hostServer.listen(HOST_PORT, r));
 
-const browser = await chromium.launch({ executablePath: CHROME, headless: true, args: ["--no-sandbox", "--disable-site-isolation-trials", "--disable-features=IsolateOrigins,site-per-process"] });
+// ENGINE=webkit runs the same checks in WebKit (WEBKIT_PATH: a Playwright WebKit
+// launcher, such as the pw_run.sh of the cached build): the desktop app's engine.
+const browser = process.env.ENGINE === "webkit"
+  ? await webkit.launch({ executablePath: process.env.WEBKIT_PATH, headless: true })
+  : await chromium.launch({ executablePath: CHROME, headless: true, args: ["--no-sandbox", "--disable-site-isolation-trials", "--disable-features=IsolateOrigins,site-per-process"] });
 const report = { checks: {}, console: [], pageErrors: [] };
 const check = (name, ok, detail) => {
   report.checks[name] = { ok: Boolean(ok), detail };
 };
 try {
-  const context = await browser.newContext({ viewport: { width: 1100, height: 720 } });
+  const [vw, vh] = (process.env.VIEW ?? "1100x720").split("x").map(Number);
+  const context = await browser.newContext({ viewport: { width: vw, height: vh } });
   const page = await context.newPage();
   page.on("console", (m) => {
     if (m.type() === "error" || m.type() === "warning") report.console.push(`${m.type()}: ${m.text().slice(0, 240)}`);
@@ -139,6 +146,10 @@ try {
     window.fileBytes = new Uint8Array(arr).buffer;
     window.fileName = "flow.excalidraw";
   }, bytes);
+  if (process.env.REPLY_FILE) {
+    const reply = JSON.parse(await readFile(process.env.REPLY_FILE, "utf8"));
+    await page.addInitScript((r) => { window.cannedReply = r; }, reply);
+  }
   await page.goto(`${HOST_ORIGIN}/`);
   // The host hands the file over on preview.ready; the frame renders it.
   const frame = await (await page.waitForSelector("#f")).contentFrame();
@@ -161,6 +172,10 @@ try {
 
   const thumb = await page.waitForFunction(() => window.log.some((m) => m.type === "preview.thumbnail"), null, { timeout: 30000 }).then(() => true).catch(() => false);
   check("thumbnail sent after first render", thumb);
+  if (process.env.THUMB_OUT && thumb) {
+    const b64 = await page.evaluate(() => { const bytes = new Uint8Array(window.thumbPng); let text = ""; for (const x of bytes) text += String.fromCharCode(x); return btoa(text); });
+    await writeFile(process.env.THUMB_OUT, Buffer.from(b64, "base64"));
+  }
 
   // Select everything: the selection chip reports the picked elements.
   // Pick the "API gateway" box (the frame fills the page; the box sits at 380,260).
@@ -168,6 +183,24 @@ try {
   await page.waitForTimeout(600);
   const sel = await page.evaluate(() => window.log.filter((m) => m.type === "preview.selection").pop()?.selection ?? null);
   check("selection names the picked box and its connection", sel && sel.label === "rectangle “API gateway”" && /to rectangle “Orders DB”/.test(sel.detail), sel && { label: sel.label, detail: sel.detail, keys: sel.keys });
+  // The host places its Ask AI action under the selection's rect: it must be a real
+  // rectangle, and pointing at its centre must pick the same box again.
+  const r = sel?.rect;
+  check("selection carries the rectangle the Ask AI action is placed under", !!r && r.w > 40 && r.h > 40, r);
+  check("a picked box is reported as a block", sel?.kind === "block", sel?.kind ?? null);
+  if (r) {
+    await page.mouse.click(r.x + r.w / 2, r.y + r.h / 2);
+    await page.waitForTimeout(500);
+    const again = await page.evaluate(() => window.log.filter((m) => m.type === "preview.selection").pop()?.selection ?? null);
+    check("the rectangle's centre is on the selected box", again?.label === "rectangle “API gateway”", again?.label ?? null);
+    // The arrow between the two boxes: aim at the middle of the gap between the two
+    // selected boxes' rectangles (the arrow's own place depends on the view, which
+    // differs between engines), by picking the second box and reading both.
+    await page.mouse.click(r.x + r.w + 40, r.y + r.h / 2);
+    await page.waitForTimeout(500);
+    const arrow = await page.evaluate(() => window.log.filter((m) => m.type === "preview.selection").pop()?.selection ?? null);
+    check("a picked arrow is reported as a region", arrow?.kind === "region" && /arrow/.test(arrow.label), arrow && { kind: arrow.kind, label: arrow.label });
+  }
 
   // Units for Compare: each labelled element, keyed by id, read from bytes.
   await page.evaluate(() => {
@@ -227,6 +260,7 @@ try {
   check("reveal selects the unit's element", revealed && revealed.label === "rectangle “Orders DB”", revealed && revealed.label);
 
   if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
+  if (process.env.SHOT) report.canvasInfo = await frame.evaluate(() => { const c = document.querySelector(".excalidraw canvas"); return c ? { w: c.width, h: c.height, css: [c.clientWidth, c.clientHeight] } : null; });
 
   // Draft with AI: the host's canned diagram is added as one undoable step, unsaved.
   await frame.fill("#prompt", "Login with a password check");

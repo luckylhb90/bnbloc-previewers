@@ -36,7 +36,10 @@ import { pendingReveal } from "../../lib/selection.ts";
 import { shortName } from "../../lib/office.ts";
 import { mountEditor, ZOOM_MAX, ZOOM_MIN, type Editor, type EditorState } from "./editor.tsx";
 import { draftOrigin, layoutDraft, readDraft, readScene, selectionOf, unitsOf, type Scene } from "./model.ts";
+import { drawCover } from "./cover.ts";
 
+/** How long after the fonts load the editor is given to settle before the baseline. */
+const SETTLE_MS = 400;
 /** How long a save may wait for the host's answer before the frame says so. */
 const SAVE_TIMEOUT_MS = 10_000;
 /** How long a draft may wait for the host's answer before the frame says so. */
@@ -78,6 +81,8 @@ let drafting = false;
 let draftTimer = 0;
 /** The elements the last draft added: "Remove draft" takes exactly these out. */
 let lastDraft: string[] = [];
+/** Bumped when a baseline is taken or superseded, so a late settle is dropped. */
+let baselineToken = 0;
 let lastSelection = "";
 let lastZoom = -1;
 let thumbnailSent = false;
@@ -127,13 +132,18 @@ function publishToolbar(zoom: number): void {
   setToolbar(toolbarItems(zoom));
 }
 
-/** The picked elements as the model reads them; the chip follows the picks. */
+/** The picked elements as the model reads them, with where they are on screen:
+ *  the host places its Ask AI action under that rectangle. Sent again when the
+ *  view moves (the rectangle changes), so the action stays beside its selection. */
 function reportSelection(ids: readonly string[]): void {
-  const key = [...ids].sort().join(",");
+  const rect = ids.length > 0 ? editor.selectionRect(ids) : null;
+  const where = rect ? [rect.x, rect.y, rect.w, rect.h].map((v) => Math.round(v)).join(",") : "";
+  const key = `${[...ids].sort().join(",")}|${where}`;
   if (key === lastSelection) return;
   lastSelection = key;
-  const scene: Scene = { elements: editor.elements(), appState: {}, files: {} };
-  sendSelection(selectionOf(scene, ids));
+  const scene: Scene = { elements: editor.elements(), appState: {}, files: {}, repairs: 0 };
+  const picked = selectionOf(scene, ids);
+  sendSelection(picked && rect ? { ...picked, rect } : picked);
 }
 
 function onEditorChange(state: EditorState): void {
@@ -143,6 +153,26 @@ function onEditorChange(state: EditorState): void {
 }
 
 const editor: Editor = mountEditor(editorEl, onEditorChange);
+
+// The frame's size is set by the workbench, and can change after the file is
+// shown: fit to the box again until the member zooms or pans by hand, or a
+// drawing fitted to a small box stays small when the box grows. A click or an
+// edit does not end the automatic fit; zooming does.
+let manualView = false;
+new ResizeObserver(() => {
+  if (loaded && !manualView) editor.fit();
+}).observe(editorEl);
+const endAutoFit = () => {
+  manualView = true;
+};
+editorEl.addEventListener("wheel", endAutoFit, { passive: true });
+window.addEventListener(
+  "keydown",
+  (e) => {
+    if (e.key === "+" || e.key === "-" || e.key === "=" || e.key === "_") endAutoFit();
+  },
+  true,
+);
 
 const reveals = pendingReveal((at) => {
   if (!loaded || !at.startsWith("el:")) return loaded;
@@ -172,27 +202,58 @@ onFile((bytes, info) => {
     return;
   }
   setTitle(shortName(info.name));
-  editor.load(scene, (state) => {
+  const token = ++baselineToken;
+  const opened = (state: EditorState) => {
     loaded = true;
+    manualView = false;
     savedVersion = state.version;
     publishToolbar(state.zoom);
     editor.fit();
     reveals.apply();
-    say("");
+    say(scene.repairs > 0 ? `Opened with ${scene.repairs} repair${scene.repairs === 1 ? "" : "s"}: some shapes had missing or invalid coordinates, points or text fields.` : "");
+    // Excalidraw re-measures text once its fonts arrive, which changes element
+    // versions without any edit: the saved baseline is taken after that.
+    void document.fonts.ready
+      .then(() => new Promise((done) => window.setTimeout(done, SETTLE_MS)))
+      .then(() => {
+        if (token !== baselineToken || !loaded) return;
+        // Text drawn before its font was ready is drawn again (WebKit does not do it on its own).
+        editor.refresh();
+        savedVersion = editor.version();
+        touched = false;
+        render();
+      });
     if (!thumbnailSent) {
       thumbnailSent = true;
-      void editor
-        .thumbnail()
-        .then((png) => (png ? provideThumbnail(png) : undefined))
-        .catch(() => {});
+      // Not during the editor's own mount: in WebKit (the desktop app's engine)
+      // an export started from inside the mount clears the scene.
+      window.setTimeout(() => {
+        void drawCover(editor.elements())
+          .then((png) => (png ? provideThumbnail(png) : undefined))
+          .catch(() => {});
+      }, 0);
     }
-  });
+  };
+  try {
+    editor.load(scene, opened);
+  } catch (err) {
+    // A scene the editor cannot draw says so, rather than sitting on "Loading".
+    loaded = false;
+    const message = `This drawing could not be drawn: ${(err instanceof Error ? err.message : String(err)).slice(0, 300)}`;
+    say(message, true);
+    reportError(message);
+  }
 });
 
 onToolbar((id, value) => {
   if (!loaded) return;
-  if (id === "zoom" && typeof value === "number") editor.zoom(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value)));
-  else if (id === "fit") editor.fit();
+  if (id === "zoom" && typeof value === "number") {
+    manualView = true;
+    editor.zoom(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value)));
+  } else if (id === "fit") {
+    manualView = false;
+    editor.fit();
+  }
 });
 
 /** Compare: each labelled element of this version, keyed by its id. */
@@ -225,6 +286,7 @@ function save(): void {
 onSaved((version) => {
   window.clearTimeout(saveTimer);
   saving = false;
+  baselineToken += 1;
   savedVersion = sentVersion;
   // The draft is part of the saved version now: it is no longer a step to remove.
   lastDraft = [];
