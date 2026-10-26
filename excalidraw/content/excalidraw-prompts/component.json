@@ -1,47 +1,258 @@
 {
   "kind": "bnbloc.prompt.package/v1",
   "name": "excalidraw-prompts",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "displayName": "Excalidraw prompts",
-  "description": "Suggested requests for Excalidraw drawings (.excalidraw files), and for the shape or arrow a member points at.",
+  "description": "Suggested requests for Excalidraw drawings (.excalidraw files): what to ask about the box or arrow a member selects, and about the whole drawing.",
   "category": "general",
-  "tags": ["files", "diagrams", "excalidraw"],
+  "tags": [
+    "files",
+    "diagrams",
+    "excalidraw"
+  ],
   "prompts": [
+    {
+      "id": "ex-block-next",
+      "title": "Add a step after it",
+      "selection": [
+        "block"
+      ],
+      "starter": true,
+      "files": {
+        "extensions": [
+          ".excalidraw",
+          ".excalidraw.json"
+        ],
+        "mimeTypes": [
+          "application/vnd.excalidraw+json"
+        ]
+      },
+      "body": "Add a new box right after the one I selected, joined to it by an arrow. Move the boxes below it down so nothing overlaps."
+    },
+    {
+      "id": "ex-block-decision",
+      "title": "Make it a decision",
+      "selection": [
+        "block"
+      ],
+      "starter": true,
+      "files": {
+        "extensions": [
+          ".excalidraw",
+          ".excalidraw.json"
+        ],
+        "mimeTypes": [
+          "application/vnd.excalidraw+json"
+        ]
+      },
+      "body": "Turn the box I selected into a question (a decision drawn as a diamond). Add the two branches out of it, labelled Yes and No, each leading to a box."
+    },
+    {
+      "id": "ex-block-fail",
+      "title": "Add a failure path",
+      "selection": [
+        "block"
+      ],
+      "starter": true,
+      "files": {
+        "extensions": [
+          ".excalidraw",
+          ".excalidraw.json"
+        ],
+        "mimeTypes": [
+          "application/vnd.excalidraw+json"
+        ]
+      },
+      "body": "Add what happens when the step I selected fails: a new box for the failure and an arrow from the selected step to it, labelled with the reason."
+    },
+    {
+      "id": "ex-block-split",
+      "title": "Split into two steps",
+      "selection": [
+        "block"
+      ],
+      "starter": true,
+      "files": {
+        "extensions": [
+          ".excalidraw",
+          ".excalidraw.json"
+        ],
+        "mimeTypes": [
+          "application/vnd.excalidraw+json"
+        ]
+      },
+      "body": "Split the box I selected into two steps in sequence, joined by an arrow. Keep what already points to it and from it."
+    },
+    {
+      "id": "ex-text-reword",
+      "title": "Reword this",
+      "selection": [
+        "text"
+      ],
+      "starter": true,
+      "files": {
+        "extensions": [
+          ".excalidraw",
+          ".excalidraw.json"
+        ],
+        "mimeTypes": [
+          "application/vnd.excalidraw+json"
+        ]
+      },
+      "body": "Reword the selected text so it is clearer and shorter. Keep its meaning."
+    },
+    {
+      "id": "ex-text-translate",
+      "title": "Translate this",
+      "selection": [
+        "text"
+      ],
+      "starter": true,
+      "files": {
+        "extensions": [
+          ".excalidraw",
+          ".excalidraw.json"
+        ],
+        "mimeTypes": [
+          "application/vnd.excalidraw+json"
+        ]
+      },
+      "body": "Translate the selected text to: "
+    },
+    {
+      "id": "ex-text-expand",
+      "title": "Say more",
+      "selection": [
+        "text"
+      ],
+      "starter": true,
+      "files": {
+        "extensions": [
+          ".excalidraw",
+          ".excalidraw.json"
+        ],
+        "mimeTypes": [
+          "application/vnd.excalidraw+json"
+        ]
+      },
+      "body": "Expand the selected text into a fuller description, keeping it short enough to fit its box."
+    },
+    {
+      "id": "ex-region-label",
+      "title": "Label the arrows",
+      "selection": [
+        "region"
+      ],
+      "starter": true,
+      "files": {
+        "extensions": [
+          ".excalidraw",
+          ".excalidraw.json"
+        ],
+        "mimeTypes": [
+          "application/vnd.excalidraw+json"
+        ]
+      },
+      "body": "Give each arrow in the selected area a short label saying what flows along it, if it has none."
+    },
+    {
+      "id": "ex-region-reverse",
+      "title": "Reverse the direction",
+      "selection": [
+        "region"
+      ],
+      "starter": true,
+      "files": {
+        "extensions": [
+          ".excalidraw",
+          ".excalidraw.json"
+        ],
+        "mimeTypes": [
+          "application/vnd.excalidraw+json"
+        ]
+      },
+      "body": "Reverse the direction of the arrows in the selected area. Keep them attached to the same boxes."
+    },
+    {
+      "id": "ex-region-align",
+      "title": "Line these up",
+      "selection": [
+        "region"
+      ],
+      "starter": true,
+      "files": {
+        "extensions": [
+          ".excalidraw",
+          ".excalidraw.json"
+        ],
+        "mimeTypes": [
+          "application/vnd.excalidraw+json"
+        ]
+      },
+      "body": "Line up the elements in the selected area in a neat row or column with even gaps. Keep every arrow attached."
+    },
+    {
+      "id": "ex-region-explain",
+      "title": "Explain this part",
+      "selection": [
+        "region"
+      ],
+      "starter": true,
+      "files": {
+        "extensions": [
+          ".excalidraw",
+          ".excalidraw.json"
+        ],
+        "mimeTypes": [
+          "application/vnd.excalidraw+json"
+        ]
+      },
+      "body": "Explain what the selected area shows and how it relates to the rest of the drawing. Do not change the file."
+    },
     {
       "id": "ex-explain",
       "title": "Explain this drawing",
-      "body": "Explain this drawing step by step: what it shows, how the boxes and arrows connect, and anything unclear or missing. Do not change the file.",
+      "starter": true,
       "files": {
-        "extensions": [".excalidraw", ".excalidraw.json"],
-        "mimeTypes": ["application/vnd.excalidraw+json"]
-      }
+        "extensions": [
+          ".excalidraw",
+          ".excalidraw.json"
+        ],
+        "mimeTypes": [
+          "application/vnd.excalidraw+json"
+        ]
+      },
+      "body": "Explain this drawing step by step: what it shows, how the boxes and arrows connect, and anything unclear or missing. Do not change the file."
     },
     {
       "id": "ex-tidy",
       "title": "Tidy the layout",
-      "body": "Tidy this drawing: line up the boxes in rows or columns, use even gaps, and keep every arrow attached to the right boxes. Keep the labels and the colours as they are.",
+      "starter": true,
       "files": {
-        "extensions": [".excalidraw", ".excalidraw.json"],
-        "mimeTypes": ["application/vnd.excalidraw+json"]
-      }
+        "extensions": [
+          ".excalidraw",
+          ".excalidraw.json"
+        ],
+        "mimeTypes": [
+          "application/vnd.excalidraw+json"
+        ]
+      },
+      "body": "Tidy this drawing: line up the boxes in rows or columns, use even gaps, and keep every arrow attached to the right boxes. Keep the labels and colours."
     },
     {
       "id": "ex-gaps",
       "title": "Check for gaps",
-      "body": "Check the drawing for gaps: boxes with no arrows, arrows that lead nowhere, steps with no owner. List them and fix the clear ones.",
+      "starter": true,
       "files": {
-        "extensions": [".excalidraw", ".excalidraw.json"],
-        "mimeTypes": ["application/vnd.excalidraw+json"]
-      }
-    },
-    {
-      "id": "ex-point",
-      "title": "Explain this part",
-      "body": "Explain the part I pointed at: what it is, what it connects to, and what would change if it were removed.",
-      "files": {
-        "extensions": [".excalidraw", ".excalidraw.json"],
-        "mimeTypes": ["application/vnd.excalidraw+json"]
-      }
+        "extensions": [
+          ".excalidraw",
+          ".excalidraw.json"
+        ],
+        "mimeTypes": [
+          "application/vnd.excalidraw+json"
+        ]
+      },
+      "body": "Check the drawing for gaps: boxes with no arrows, arrows that lead nowhere, steps with no owner. List them and fix the clear ones."
     }
   ]
 }

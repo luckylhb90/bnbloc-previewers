@@ -1,7 +1,7 @@
 {
   "kind": "bnbloc.assist.package/v1",
   "name": "draw-diagram",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "displayName": "Draw a diagram",
   "description": "Drafts the boxes and arrows of an Excalidraw diagram from one sentence the member types, for the drawing editor's Draft with AI.",
   "category": "authoring",
@@ -16,7 +16,8 @@
       "type": "items",
       "item": [
         { "name": "id", "description": "A short unique id for the box: n1, n2, n3 and so on" },
-        { "name": "label", "description": "What the box says, at most 60 characters" }
+        { "name": "label", "description": "What the box says, at most 60 characters" },
+        { "name": "kind", "description": "decision when the box asks a question and the arrows leaving it are its answers, otherwise step" }
       ]
     },
     {
