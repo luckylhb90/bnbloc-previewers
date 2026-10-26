@@ -1,0 +1,61 @@
+/* The frame's own chrome (the status line and the Save button). The drawing
+   keeps Excalidraw's own look: a white canvas whatever the theme. */
+:root {
+  --bg: #f6f6f4;
+  --fg: #1d1d1b;
+  --muted: #6b6b66;
+  --line: #d6d5d1;
+  --accent: #5b4bd6;
+  --danger: #b3261e;
+  color-scheme: light;
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--fg);
+  font: 12px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+body {
+  display: flex;
+  flex-direction: column;
+}
+#editor {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+#bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--line);
+}
+#status {
+  flex: 1;
+  margin: 0;
+  min-height: 1.4em;
+  color: var(--muted);
+}
+#status.error {
+  color: var(--danger);
+}
+#save {
+  font: inherit;
+  padding: 4px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  color: #ffffff;
+  cursor: pointer;
+}
+#save:disabled {
+  opacity: 0.45;
+  cursor: default;
+}

@@ -1,0 +1,10 @@
+{
+  "kind": "bnbloc.skill.package/v1",
+  "name": "excalidraw-skills",
+  "version": "1.0.0",
+  "displayName": "Excalidraw skills",
+  "description": "Drawing and changing Excalidraw diagrams (.excalidraw files) in place: the scene format, bindings, and how an agent edits a member's drawing without disturbing the rest of it.",
+  "category": "general",
+  "tags": ["diagrams", "excalidraw", "files"],
+  "skills": ["excalidraw-diagrams"]
+}

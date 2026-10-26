@@ -6,10 +6,10 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "test": "node --import tsx --test lib/*.test.mjs */build.test.mjs",
-    "build": "for p in sprite-sheet pptx docx xlsx mermaid drawio font; do node $p/build.mjs || exit 1; done"
+    "build": "for p in sprite-sheet pptx docx xlsx mermaid drawio font excalidraw; do node $p/build.mjs || exit 1; done"
   },
   "devDependencies": {
-    "@bnbloc/previewer-sdk": "github:luckylhb90/bnbloc#5fe72956&path:/web/previewer-sdk",
+    "@bnbloc/previewer-sdk": "github:luckylhb90/bnbloc#bba2b06d&path:/web/previewer-sdk",
     "esbuild": "0.25.12",
     "tsx": "4.20.6",
     "typescript": "5.9.3"

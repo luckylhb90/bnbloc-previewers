@@ -9,8 +9,8 @@ importers:
   .:
     devDependencies:
       '@bnbloc/previewer-sdk':
-        specifier: github:luckylhb90/bnbloc#5fe72956&path:/web/previewer-sdk
-        version: https://codeload.github.com/luckylhb90/bnbloc/tar.gz/5fe729561c5cec5baffafe60a21e8fb642675c9c#path:/web/previewer-sdk
+        specifier: github:luckylhb90/bnbloc#bba2b06d&path:/web/previewer-sdk
+        version: https://codeload.github.com/luckylhb90/bnbloc/tar.gz/bba2b06dafbcaa2fd47ebc291d40a34a3f263eb8#path:/web/previewer-sdk
       esbuild:
         specifier: 0.25.12
         version: 0.25.12
@@ -23,8 +23,8 @@ importers:
 
 packages:
 
-  '@bnbloc/previewer-sdk@https://codeload.github.com/luckylhb90/bnbloc/tar.gz/5fe729561c5cec5baffafe60a21e8fb642675c9c#path:/web/previewer-sdk':
-    resolution: {gitHosted: true, integrity: sha512-t3ObDQKW9PJnKap7B3DSRs6lKxJ6OAyoR/f5QiQ8mtVC+e7yaBlO83DgD4V4jCwbSv/+vOM/rxvXs6F0N26Adw==, path: /web/previewer-sdk, tarball: https://codeload.github.com/luckylhb90/bnbloc/tar.gz/5fe729561c5cec5baffafe60a21e8fb642675c9c}
+  '@bnbloc/previewer-sdk@https://codeload.github.com/luckylhb90/bnbloc/tar.gz/bba2b06dafbcaa2fd47ebc291d40a34a3f263eb8#path:/web/previewer-sdk':
+    resolution: {gitHosted: true, integrity: sha512-nA3Y2lxJMjhb5tYbkXuvBE1aVZ2VTT46eAkasHq/ScMt8sienaVWBoZf7Ge8ik2kTGOwdH0HBTn8wjPUxCUI6w==, path: /web/previewer-sdk, tarball: https://codeload.github.com/luckylhb90/bnbloc/tar.gz/bba2b06dafbcaa2fd47ebc291d40a34a3f263eb8}
     version: 1.0.0
 
   '@esbuild/aix-ppc64@0.25.12':
@@ -211,7 +211,7 @@ packages:
 
 snapshots:
 
-  '@bnbloc/previewer-sdk@https://codeload.github.com/luckylhb90/bnbloc/tar.gz/5fe729561c5cec5baffafe60a21e8fb642675c9c#path:/web/previewer-sdk': {}
+  '@bnbloc/previewer-sdk@https://codeload.github.com/luckylhb90/bnbloc/tar.gz/bba2b06dafbcaa2fd47ebc291d40a34a3f263eb8#path:/web/previewer-sdk': {}
 
   '@esbuild/aix-ppc64@0.25.12':
     optional: true

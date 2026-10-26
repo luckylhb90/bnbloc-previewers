@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Excalidraw previewer</title>
+<!-- Excalidraw previewer (bnbloc.previewer.contract/v1). Runs in a sandboxed
+     opaque-origin frame: no inline script, no network, assets from the bundle
+     only. -->
+<link rel="stylesheet" href="excalidraw.css">
+<link rel="stylesheet" href="style.css">
+<script src="main.js" defer></script>
+</head>
+<body>
+<main id="editor" aria-label="Drawing"></main>
+<footer id="bar">
+  <p id="status" role="status"></p>
+  <button id="save" type="button" disabled>Save</button>
+</footer>
+</body>
+</html>

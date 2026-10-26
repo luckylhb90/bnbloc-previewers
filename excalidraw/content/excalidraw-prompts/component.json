@@ -1,0 +1,47 @@
+{
+  "kind": "bnbloc.prompt.package/v1",
+  "name": "excalidraw-prompts",
+  "version": "1.0.0",
+  "displayName": "Excalidraw prompts",
+  "description": "Suggested requests for Excalidraw drawings (.excalidraw files), and for the shape or arrow a member points at.",
+  "category": "general",
+  "tags": ["files", "diagrams", "excalidraw"],
+  "prompts": [
+    {
+      "id": "ex-explain",
+      "title": "Explain this drawing",
+      "body": "Explain this drawing step by step: what it shows, how the boxes and arrows connect, and anything unclear or missing. Do not change the file.",
+      "files": {
+        "extensions": [".excalidraw", ".excalidraw.json"],
+        "mimeTypes": ["application/vnd.excalidraw+json"]
+      }
+    },
+    {
+      "id": "ex-tidy",
+      "title": "Tidy the layout",
+      "body": "Tidy this drawing: line up the boxes in rows or columns, use even gaps, and keep every arrow attached to the right boxes. Keep the labels and the colours as they are.",
+      "files": {
+        "extensions": [".excalidraw", ".excalidraw.json"],
+        "mimeTypes": ["application/vnd.excalidraw+json"]
+      }
+    },
+    {
+      "id": "ex-gaps",
+      "title": "Check for gaps",
+      "body": "Check the drawing for gaps: boxes with no arrows, arrows that lead nowhere, steps with no owner. List them and fix the clear ones.",
+      "files": {
+        "extensions": [".excalidraw", ".excalidraw.json"],
+        "mimeTypes": ["application/vnd.excalidraw+json"]
+      }
+    },
+    {
+      "id": "ex-point",
+      "title": "Explain this part",
+      "body": "Explain the part I pointed at: what it is, what it connects to, and what would change if it were removed.",
+      "files": {
+        "extensions": [".excalidraw", ".excalidraw.json"],
+        "mimeTypes": ["application/vnd.excalidraw+json"]
+      }
+    }
+  ]
+}

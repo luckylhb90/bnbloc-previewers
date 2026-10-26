@@ -1,0 +1,5 @@
+dist/
+node_modules/
+# Staged by build.mjs from the Excalidraw package: the stylesheet and fonts.
+excalidraw.css
+fonts/

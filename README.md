@@ -16,6 +16,7 @@ sandboxed iframe with no network, and talks to bnbloc only through
 | `mermaid` | `.mmd`, `.mermaid` | strict mode, a parse error shown with its line |
 | `drawio` | `.drawio`, `.dio` | every page as a tab, draw.io's own geometry |
 | `font` | `.ttf`, `.otf`, `.woff`, `.woff2` | a specimen: names and license, an editable sample with missing characters marked, variation-axis sliders, a glyph grid |
+| `excalidraw` | `.excalidraw`, `.excalidraw.json` | Excalidraw's own editor: drawn as it is, edited in the frame and saved as the next version (Ctrl/⌘ S); points at a box or an arrow for Ask AI; Compare by element. Ships a skill pack and a prompt pack (`excalidraw/content/`) |
 
 All of them point (a click names what it is for the Ask AI panel) and offer
 units for Compare (the font previewer's units are the font's facts: names,
