@@ -30,6 +30,10 @@ body {
   min-height: 0;
   position: relative;
 }
+/* A view-only frame (a shared file) has nothing to save or draft: no footer. */
+:root[data-view-only="true"] #bar {
+  display: none;
+}
 #bar {
   display: flex;
   flex-direction: column;

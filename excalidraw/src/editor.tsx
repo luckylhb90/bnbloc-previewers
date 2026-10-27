@@ -43,6 +43,8 @@ export interface Editor {
   reveal(id: string): void;
   /** Redraws the scene (text drawn before its font loaded is drawn again). */
   refresh(): void;
+  /** View mode: the drawing can be looked at, zoomed and panned, not changed. */
+  setViewOnly(on: boolean): void;
   /** The file's bytes as the editor writes them (an .excalidraw JSON). */
   serialize(): string;
   /** The scene's version now (compare with a saved version to see an edit). */
@@ -72,40 +74,49 @@ export function mountEditor(container: HTMLElement, onChange: (state: EditorStat
       selectedIds: Object.keys(app.selectedElementIds).filter((id) => app.selectedElementIds[id]),
     };
   };
+  // Declared before apply: the view mode is not the file's to set.
+  let viewOnly = false;
   const apply = (scene: Scene, loaded: (state: EditorState) => void) => {
     if (!api) return;
     const elements = restoreElements(scene.elements as never, null, { repairBindings: true });
-    const appState = restoreAppState(scene.appState as never, null);
+    // restoreAppState hands back a whole state, view mode off among it: the mode
+    // is the host's (a shared file is view-only), so it is set again after it.
+    const appState = { ...restoreAppState(scene.appState as never, null), viewModeEnabled: viewOnly };
     api.updateScene({ elements, appState });
     if (Object.keys(scene.files).length > 0) api.addFiles(Object.values(scene.files) as never);
     loaded(state());
   };
 
-  createRoot(container).render(
-    <Excalidraw
-      excalidrawAPI={(next) => {
-        api = next;
-        // Not during the mount: the editor finishes mounting after this call, and
-        // a scene set inside it is cleared (seen in WebKit, the desktop engine).
-        const waiting = pending;
-        pending = null;
-        if (waiting) window.setTimeout(() => apply(waiting.scene, waiting.loaded), 0);
-      }}
-      theme="light"
-      langCode="en"
-      aiEnabled={false}
-      onChange={() => onChange(state())}
-      UIOptions={{
-        canvasActions: {
-          loadScene: false,
-          saveToActiveFile: false,
-          saveAsImage: false,
-          toggleTheme: false,
-          export: { saveFileToDisk: false },
-        },
-      }}
-    />,
-  );
+  const root = createRoot(container);
+  const onApi = (next: ExcalidrawAPI) => {
+    api = next;
+    // Not during the mount: the editor finishes mounting after this call, and
+    // a scene set inside it is cleared (seen in WebKit, the desktop engine).
+    const waiting = pending;
+    pending = null;
+    if (waiting) window.setTimeout(() => apply(waiting.scene, waiting.loaded), 0);
+  };
+  const show = () =>
+    root.render(
+      <Excalidraw
+        excalidrawAPI={onApi}
+        theme="light"
+        langCode="en"
+        aiEnabled={false}
+        viewModeEnabled={viewOnly}
+        onChange={() => onChange(state())}
+        UIOptions={{
+          canvasActions: {
+            loadScene: false,
+            saveToActiveFile: false,
+            saveAsImage: false,
+            toggleTheme: false,
+            export: { saveFileToDisk: false },
+          },
+        }}
+      />,
+    );
+  show();
 
   return {
     load(scene, loaded) {
@@ -122,6 +133,13 @@ export function mountEditor(container: HTMLElement, onChange: (state: EditorStat
     },
     refresh() {
       api?.refresh();
+    },
+    setViewOnly(on) {
+      if (on === viewOnly) return;
+      viewOnly = on;
+      show();
+      // Also the state itself: a scene loaded meanwhile may have reset it.
+      api?.updateScene({ appState: { viewModeEnabled: on } as never });
     },
     reveal(id) {
       if (!api) return;

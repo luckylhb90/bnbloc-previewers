@@ -86,6 +86,10 @@ let baselineToken = 0;
 let lastSelection = "";
 let lastZoom = -1;
 let thumbnailSent = false;
+/** The host asked for a view-only frame (a shared file): look, zoom, pan; no save,
+ *  no draft, no Ask AI. The host refuses those messages anyway (a frame is not
+ *  trusted to comply); this makes the page not offer them. */
+let viewOnly = false;
 
 function dirty(): boolean {
   return loaded && touched && editor.version() !== savedVersion;
@@ -136,6 +140,7 @@ function publishToolbar(zoom: number): void {
  *  the host places its Ask AI action under that rectangle. Sent again when the
  *  view moves (the rectangle changes), so the action stays beside its selection. */
 function reportSelection(ids: readonly string[]): void {
+  if (viewOnly) return;
   const rect = ids.length > 0 ? editor.selectionRect(ids) : null;
   const where = rect ? [rect.x, rect.y, rect.w, rect.h].map((v) => Math.round(v)).join(",") : "";
   const key = `${[...ids].sort().join(",")}|${where}`;
@@ -181,7 +186,10 @@ const reveals = pendingReveal((at) => {
 });
 
 onInit((init) => {
+  viewOnly = init.viewOnly === true;
   document.documentElement.dataset.theme = init.theme === "dark" ? "dark" : "light";
+  document.documentElement.dataset.viewOnly = viewOnly ? "true" : "false";
+  editor.setViewOnly(viewOnly);
   say(`Loading ${init.file.name}…`);
   publishToolbar(lastZoom < 0 ? 1 : lastZoom);
 });
@@ -262,7 +270,7 @@ onUnits(async (bytes) => unitsOf(readScene(new TextDecoder("utf-8").decode(bytes
 onReveal((at) => reveals.ask(at));
 
 function save(): void {
-  if (!file || !loaded || saving || !dirty()) return;
+  if (viewOnly || !file || !loaded || saving || !dirty()) return;
   saving = true;
   notice = { text: "", error: false };
   sentVersion = editor.version();
@@ -302,7 +310,7 @@ onSaveFailed((message) => {
 /** Asks the host for a draft of the sentence in the footer. */
 function askDraft(): void {
   const prompt = promptEl.value.trim();
-  if (!loaded || drafting || !prompt) return;
+  if (viewOnly || !loaded || drafting || !prompt) return;
   drafting = true;
   notice = { text: "", error: false };
   render();

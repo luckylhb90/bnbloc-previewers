@@ -76,7 +76,7 @@ const hostHtml = `<!doctype html><meta charset="utf-8"><title>host</title>
     const bytes = window.fileBytes;
     frame.contentWindow.postMessage({ type: "preview.init", protocol: 1,
       file: { name: window.fileName, mimeType: "application/vnd.excalidraw+json", sizeBytes: bytes.byteLength, version: window.fileVersion ?? 1 },
-      theme: "light", viewport: { w: innerWidth, h: innerHeight } }, "*");
+      theme: "light", viewport: { w: innerWidth, h: innerHeight }, ...(window.initViewOnly ? { viewOnly: true } : {}) }, "*");
     frame.contentWindow.postMessage({ type: "preview.file", bytes: bytes.slice(0) }, "*", [bytes.slice(0)]);
   };
   window.post = (msg, transfer = []) => frame.contentWindow.postMessage(msg, "*", transfer);
@@ -128,6 +128,7 @@ const browser = process.env.ENGINE === "webkit"
   ? await webkit.launch({ executablePath: process.env.WEBKIT_PATH, headless: true })
   : await chromium.launch({ executablePath: CHROME, headless: true, args: ["--no-sandbox", "--disable-site-isolation-trials", "--disable-features=IsolateOrigins,site-per-process"] });
 const report = { checks: {}, console: [], pageErrors: [] };
+const VIEW_ONLY_DONE = "view-only scenario done";
 const check = (name, ok, detail) => {
   report.checks[name] = { ok: Boolean(ok), detail };
 };
@@ -150,11 +151,12 @@ try {
     const reply = JSON.parse(await readFile(process.env.REPLY_FILE, "utf8"));
     await page.addInitScript((r) => { window.cannedReply = r; }, reply);
   }
+  if (process.env.VIEW_ONLY) await page.addInitScript(() => { window.initViewOnly = true; });
   await page.goto(`${HOST_ORIGIN}/`);
   // The host hands the file over on preview.ready; the frame renders it.
   const frame = await (await page.waitForSelector("#f")).contentFrame();
 
-  await frame.waitForSelector("#save", { timeout: 60000 });
+  await frame.waitForSelector("#save", { state: "attached", timeout: 60000 });
   await frame.waitForFunction(() => document.querySelector(".excalidraw canvas") !== null, null, { timeout: 60000 }).catch(() => {});
   await page.waitForTimeout(1500);
   check("editor canvas mounted", await frame.evaluate(() => document.querySelector(".excalidraw canvas") !== null));
@@ -175,6 +177,23 @@ try {
   if (process.env.THUMB_OUT && thumb) {
     const b64 = await page.evaluate(() => { const bytes = new Uint8Array(window.thumbPng); let text = ""; for (const x of bytes) text += String.fromCharCode(x); return btoa(text); });
     await writeFile(process.env.THUMB_OUT, Buffer.from(b64, "base64"));
+  }
+
+  if (process.env.VIEW_ONLY) {
+    // A shared file: look, zoom, pan. The footer is gone, nothing can be changed or
+    // saved, and the cover is still sent (the share page swaps its poster on it).
+    check("view-only: the footer is not shown", !(await frame.isVisible("#bar")));
+    check("view-only: the editor offers no drawing tools", (await frame.locator(".App-toolbar").count()) === 0, await frame.locator(".App-toolbar").count());
+    await page.mouse.click(380, 262);
+    await page.keyboard.press("Delete");
+    await page.keyboard.press("Shift+ArrowRight");
+    await page.keyboard.press("Control+s");
+    await page.waitForTimeout(600);
+    const sent = await page.evaluate(() => window.log.map((m) => m.type));
+    check("view-only: no save, draft or selection leaves the frame", !sent.some((t) => ["preview.save", "preview.draft", "preview.selection"].includes(t)), sent.filter((t) => ["preview.save", "preview.draft", "preview.selection"].includes(t)));
+    const units = await frame.evaluate(() => document.querySelector(".excalidraw canvas") !== null);
+    check("view-only: the drawing is drawn", units);
+    throw new Error(VIEW_ONLY_DONE);
   }
 
   // Select everything: the selection chip reports the picked elements.
@@ -297,7 +316,8 @@ try {
   const refusal = await frame.textContent("#status");
   check("non-scene refused with a sentence", /not an Excalidraw drawing/.test(refusal), refusal);
 } catch (err) {
-  report.harnessError = String(err && err.stack ? err.stack : err).slice(0, 800);
+  // The view-only scenario is a short one: it ends by this marker, not by a failure.
+  if (!(err instanceof Error && err.message === VIEW_ONLY_DONE)) report.harnessError = String(err && err.stack ? err.stack : err).slice(0, 800);
 } finally {
   await browser.close();
   server.close();
